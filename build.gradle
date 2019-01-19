@@ -15,7 +15,7 @@ FileTree bashtree = fileTree(dir: 'src/bash', include: '*.sh')
 // to be able to deploy, and setup must be done beforehand.
 remotes {
     jetson {
-        host = '10.10.10.10' // you'll need the real IP here.
+        host = '10.68.29.8' // you'll need the real IP here.
         user = 'REDACTED'  //and user
         password = 'REDACTED' //and pass
         agent = false
@@ -29,7 +29,7 @@ task deployJetson {
             //I don't know why yet.  So use user/pass for now.
             // path to the private key
             // identity = file('')            
-            // knownHosts = allowAnyHosts
+            knownHosts = allowAnyHosts
         }
         session(remotes.jetson) {
             // put from: '/Users/y0shi/workspace/frc/JetsonPythonSample/src/python/', into: '/home/nvidia/6829/vision/python', filter: { it.name =~ /\.py$/ }
