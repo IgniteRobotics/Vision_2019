@@ -1,0 +1,57 @@
+// Applies the Gradle SSH plugins from before.
+plugins {
+    id "java"
+    id "org.hidetake.ssh" version "2.9.0"
+    id "jaci.gradle.EmbeddedTools" version "2018.12.18"
+}
+
+// Creates a FileTree object to only pull all .py files within
+// the python folder in directory path for deployment.
+FileTree pytree = fileTree(dir: 'src/python', include: '*.py')
+FileTree bashtree = fileTree(dir: 'src/bash', include: '*.sh')
+
+// Identifies the remote with a name, jetson, and a host static
+// IP as well as teh username, roboloco. SSH Keys are required
+// to be able to deploy, and setup must be done beforehand.
+remotes {
+    jetson {
+        host = '10.10.10.10' // you'll need the real IP here.
+        user = 'REDACTED'  //and user
+        password = 'REDACTED' //and pass
+        agent = false
+    }
+}
+
+task deployJetson {
+    ssh.run {
+        settings {
+            // This private keyu stuff isn't working.  
+            //I don't know why yet.  So use user/pass for now.
+            // path to the private key
+            // identity = file('')            
+            // knownHosts = allowAnyHosts
+        }
+        session(remotes.jetson) {
+            // put from: '/Users/y0shi/workspace/frc/JetsonPythonSample/src/python/', into: '/home/nvidia/6829/vision/python', filter: { it.name =~ /\.py$/ }
+            // make all the directories.  ignore errors in case they're already there.
+            execute ('mkdir 6829', ignoreError: true)
+            execute ('mkdir 6829/vision', ignoreError: true)
+            execute ('mkdir 6829/vision/python', ignoreError: true)
+            execute ('mkdir 6829/vision/bash', ignoreError: true)
+            put from: pytree, into: '6829/vision/python'
+            put from: bashtree, into: '6829/vision/bash'
+            // execute 'sudo /bin/systemctl restart vision'
+        }
+    }
+}
+
+deploy {
+    targets {
+        target('jetson') {
+            // If you are setting up, comment out the line 
+            // below to prevent a error.
+            deployJetson
+            }
+    }
+}
+
