@@ -1,0 +1,14 @@
+[Unit]
+Description=Camera stream to driver
+After=multi-user.target sortcams.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+ExecStartPre=/home/nvidia/6829/vision/bash/config_stream_camera.sh
+ExecStart=/home/nvidia/6829/vision/bash/gstreamer_server.sh /dev/streamcam 10.68.29.2 5025
+StandardInput=tty-force
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

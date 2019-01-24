@@ -1,0 +1,13 @@
+[Unit]
+Description=Sort Cameras
+After=multi-user.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+ExecStart=/home/nvidia/6829/vision/bash/sortcams.sh
+StandardInput=tty-force
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
