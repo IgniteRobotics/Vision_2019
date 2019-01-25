@@ -5,8 +5,9 @@ Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
-ExecStartPre=/home/nvidia/6829/vision/bash/config_stream_camera.sh
-ExecStart=/home/nvidia/6829/vision/bash/gstreamer_server.sh /dev/streamcam 10.68.29.2 5025
+ExecStartPre=/bin/bash /home/nvidia/6829/vision/bash/config_stream_camera.sh
+ExecStart=/bin/bash /home/nvidia/6829/vision/bash/gstreamer_server.sh /dev/streamcam 10.68.29.2 5025
+ExecStop=/usr/bin/pkill -f gstreamer_server
 StandardInput=tty-force
 Restart=on-failure
 
