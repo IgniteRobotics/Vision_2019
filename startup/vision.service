@@ -1,12 +1,11 @@
 [Unit]
-Description=Robot Vision
-After=multi-user.target
+Description=Robot Vision Tracking
+After=multi-user.target sortcams.target
 Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
-ExecStartPre=/home/josh/vision/sortcams.sh
-ExecStart=/usr/bin/python3 /home/josh/vision/main.py
+ExecStart=/usr/bin/python3 /home/nvidia/6829/vision/python/main.py
 StandardInput=tty-force
 Restart=on-failure
 

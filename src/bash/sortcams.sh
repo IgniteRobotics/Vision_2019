@@ -4,8 +4,8 @@
 # the cam serial number must be in the CAM_MAP.
 
 declare -A CAM_MAP
-CAM_MAP[046d_0821_4804CA90]=cam0  # logitech
-CAM_MAP[HD_Camera_Manufacturer_USB_2.0_Camera]=cam1  #fisheye.  no really.
+CAM_MAP[046d_0821_4804CA90]=visioncam  # logitech
+CAM_MAP[HD_Camera_Manufacturer_USB_2.0_Camera]=streamcam  #fisheye.  no really.
 
 
 for cam in $(ls /dev/video*); do
