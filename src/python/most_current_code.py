@@ -7,6 +7,12 @@ import time
 import cv2
 import math
 import imutils
+import os
+
+havedisplay = 'DISPLAY' in os.environ
+
+if(havedisplay): 
+	print("display present")
 
 greenLower = (0,0,250) 
 greenUpper = (100,255,255) 
@@ -85,7 +91,7 @@ pts = deque(maxlen=args["buffer"])
 
 # if a video path was not supplied, grab the reference to the webcam
 if not args.get("video", False):
-	vs = VideoStream(src=1).start()
+	vs = VideoStream(src=0).start()
 
 # otherwise, grab a reference to the video file
 else:
@@ -151,13 +157,14 @@ while True:
 	#if (contour > size requirement):#--- more than one contour (two tapes)
 	#	contour_angle(frame, cnts)
 
-	# show the frame to our screen
-	cv2.imshow("Frame", frame)
-	key = cv2.waitKey(1) & 0xFF
-	#print("running")
-	# if the 'q' key is pressed, stop the loop
-	if key == ord("q"):
-		break
+	if(havedisplay):
+		# show the frame to our screen
+		cv2.imshow("Frame", frame)
+		key = cv2.waitKey(1) & 0xFF
+		#print("running")
+		# if the 'q' key is pressed, stop the loop
+		if key == ord("q"):
+			break
 
 # if we are not using a video file, stop the camera video stream
 if not args.get("video", False):
