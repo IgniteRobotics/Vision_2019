@@ -16,8 +16,8 @@ FileTree bashtree = fileTree(dir: 'src/bash', include: '*.sh')
 remotes {
     jetson {
         host = '10.68.29.8' // you'll need the real IP here.
-        user = 'REDACTED'  //and user
-        password = 'REDACTED' //and pass
+        user = 'nvidia' //'REDACTED'  //and user
+        password = 'nvidia' //'REDACTED' //and pass
         agent = false
     }
 }
@@ -55,3 +55,7 @@ deploy {
     }
 }
 
+// Maven central needed for JUnit 
+repositories {
+    mavenCentral()
+}
