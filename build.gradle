@@ -54,9 +54,19 @@ task deployJetson {
             executeSudo 'ln -s  /home/nvidia/6829/vision/init.d/vision.service /etc/systemd/system/vision.service', pty: true, sudoPassword: sshPass, ignoreError: true
 
             executeSudo 'systemctl daemon-reload', pty: true, sudoPassword: sshPass, ignoreError: true
+
+            // enable so they start automatically.
+            executeSudo 'systemctl enable sortcams.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl enable vision.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl enable streamcam.service', pty: true, sudoPassword: sshPass, ignoreError: true
             
-            executeSudo 'systemctl restart vision', pty: true, sudoPassword: sshPass
-            executeSudo 'systemctl restart streamcam', pty: true, sudoPassword: sshPass
+            // stop the services but don't stop if this fails.
+            executeSudo 'systemctl stop vision', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl stop streamcam', pty: true, sudoPassword: sshPass, ignoreError: true
+            
+            executeSudo 'systemctl start sortcams', pty: true, sudoPassword: sshPass
+            executeSudo 'systemctl start vision', pty: true, sudoPassword: sshPass
+            executeSudo 'systemctl start streamcam', pty: true, sudoPassword: sshPass
         }
     }
 }
