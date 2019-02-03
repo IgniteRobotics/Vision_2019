@@ -10,6 +10,7 @@ credentials.gradle
 .project
 .settings/
 .vscode/
+.wpilib/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
