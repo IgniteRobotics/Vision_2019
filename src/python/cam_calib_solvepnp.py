@@ -15,20 +15,18 @@ greenUpper = (100,255,255)
 
 KNOWN_WIDTH_BTWN_TAPE = 11.0 #inches (not exact)
 
-#TAPE_HEIGHT = 6.0 # guess that it's about 2ft off ground
-#CAM_HEIGHT = 0.0 # guess at camera height
-#TILT_ANGLE = 14.5 # guess at angle
+# The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
+obj_points = np.array([[0, 0, 0], [2, 0, 0], [2, 5.75, 0], [0, 5.75, 0]], np.float32)
 
-# paths to the mtx and dist files
-mtx_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/mtx.pkl"
-dist_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/dist.pkl"
+# paths to the cameraMatrix and distortMatrix files
+cameraMatrix_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/cameraMatrix.pkl"
+distortMatrix_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/distortMatrix.pkl"
 rvecs_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/rvecs.pkl"
 tvecs_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/tvecs.pkl"
-#ret_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/ret.pkl"
 
-# opening / loading the mtx and dist files
-mtx = pickle.load(open(mtx_filepath, "rb")) 
-dist = pickle.load(open(dist_filepath, "rb"))
+# opening / loading the cameraMatrix and distortMatrix files
+cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
+distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
 rvec = pickle.load(open(rvecs_filepath, "rb")) 
 tvec = pickle.load(open(tvecs_filepath, "rb"))
 #ret = pickle.load(open(ret_filepath, "rb")) 
@@ -42,32 +40,29 @@ def get_center(contour):
 def get_angle(p1, p2):
 	return math.atan2(p1[1] - p2[1], p1[0] - p2[0]) * 180/math.pi
 
-def get_midpoint(p1, p2):
-	return ((p1[0] + p2[0])/2, (p1[1] + p2[1])/2)
-
-def undistort_img(img, mtx, dist):
+def undistort_img(img, cameraMatrix, distortMatrix):
 	h, w = img.shape[:2]
-	newcameramtx, roi=cv2.getOptimalNewCameraMatrix(mtx,dist,(w,h),1,(w,h))
+	newcameraMatrix, roi=cv2.getOptimalNewCameraMatrix(cameraMatrix,distortMatrix,(w,h),1,(w,h))
 	
 	# undistort image
-	dst = cv2.undistort(img, mtx, dist, None, newcameramtx)
+	dst = cv2.undistort(img, cameraMatrix, distortMatrix, None, newcameraMatrix)
 	
-	# crop the image
+	# crop the undistored image
 	x,y,w,h = roi
 	return dst[y:y+h, x:x+w]
 	
-def rid_noise(img, mtx, dist):
+def rid_noise(img): #, cameraMatrix, distortMatrix):
 	# calls method to undistort image
-	undist_img = undistort_img(img, mtx, dist)
+	#undistortMatrix_img = undistort_img(img, cameraMatrix, distortMatrix)
+
 	#blurred = cv2.GaussianBlur(img, (5, 5), 0) #(11, 11)?
-	hsv = cv2.cvtColor(undist_img, cv2.COLOR_BGR2HSV)#undist_img, cv2.COLOR_BGR2HSV)
+	hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)#undistortMatrix_img, cv2.COLOR_BGR2HSV)
 	mask = cv2.inRange(hsv, greenLower, greenUpper)
 
 	# threshold the image, then perform a series of erosions + dilations to remove any small regions of noise
 	thresh = cv2.threshold(mask, 45, 255, cv2.THRESH_BINARY)[1]
 	thresh = cv2.erode(thresh, None, iterations=2)
 	thresh = cv2.dilate(thresh, None, iterations=2)
-
 	return thresh
 
 def contour_angle(img, c):
@@ -93,7 +88,7 @@ def contour_angle(img, c):
 #	cv2.putText(img, str(extTop), extTop, cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 3)
 #	cv2.putText(img, str(extBottom), extBottom, cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 0), 3)
 	
-	return extLeft, extRight, extTop, extBottom
+	return [extLeft, extRight, extTop, extBottom]
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -125,22 +120,42 @@ while True:
 	if frame is None:
 		break
 
-	frame_height, frame_width = frame.shape[:2]
+	frame_height, frame_width = frame.shape[:2] # ---------------------------------------------might be nicer way outside of loop
 
 	mid_frame = (int(frame_width / 2), int(frame_height / 2))
 
-	frame_hsv = rid_noise(frame, mtx, dist)
-	frame = undistort_img(frame, mtx, dist)
+	frame = undistort_img(frame, cameraMatrix, distortMatrix)
+	frame_hsv = rid_noise(frame)#, cameraMatrix, distortMatrix)
+#	frame = undistort_img(frame, cameraMatrix, distortMatrix)
 
 	# find contours in thresholded frame, then grab the largest one
 	cnts = cv2.findContours(frame_hsv.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 	cnts = imutils.grab_contours(cnts)
 	sd = ShapeDetector()
 
+	c = max(cnts, key=cv2.contourArea)
+
+	if c is not None and len(c) != 0:
+		cornerPoints = contour_angle(frame, c)
+
+		if((sd.detect(c) == "rectangle") or (sd.detect(c) == "square")):
+			#[extLeft, extRight, extTop, extBottom]
+
+			# Top left (Blue)
+			frame = cv2.circle(frame, (cornerPoints[0][0], cornerPoints[0][1]), 5, (255, 0, 0))
+			# Top right (Red)
+			frame = cv2.circle(frame, (cornerPoints[1][0], cornerPoints[1][1]), 5, (0, 0, 255))
+			# Bottom right (white)
+			frame = cv2.circle(frame, (cornerPoints[2][0], cornerPoints[2][1]), 5, (255, 255, 255))
+			# Bottom left (yellow)
+			frame = cv2.circle(frame, (cornerPoints[3][0], cornerPoints[3][1]), 5, (0, 255, 255))
+
+		cv2.imshow("frame", frame)
+		key = cv2.waitKey(1) & 0xFF
+
 	if len(cnts) > 0:
 		# for ever contour in the mask, use it to compute the minimum enclosing circle and centroid
 		centers = []
-		cnt = []
 		for contour in cnts:
 			((x, y), radius) = cv2.minEnclosingCircle(contour)	
 			M = cv2.moments(contour)
@@ -155,24 +170,11 @@ while True:
 				cv2.circle(frame, center, 5, (0, 0, 255), -1)
 
 				centers.append(center)
-				cnt.append(contour)
-
 				# multiply the contour (x, y)-coordinates by the resize ratio,
 				# then draw the contours and the name of the shape on the image
 				cv2.drawContours(frame, [contour], -1, (0, 255, 0), 2)
 				cv2.putText(frame, "shape", (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX,	0.5, (255, 255, 255), 2)
-			'''				
-				if(len(cnt) == 2):
-					extLeft1, extRight1, extTop1, extBottom1 = contour_angle(frame, cnt[0])
-					extLeft2, extRight2, extTop2, extBottom2 = contour_angle(frame, cnt[1])
-					boxy = [max(extLeft1,extLeft2),
-							max(extRight1,extRight2),
-							min(extLeft1,extLeft2),
-							min(extRight1,extRight2)]
-					epsilon = 0.1*cv2.arcLength(boxy,True)
-					approx = cv2.approxPolyDP(boxy,epsilon,True)
-					cv2.drawContours(frame, [approx], -1, (0, 0, 0), 2)
-			'''
+
 		if(len(centers) == 2):
 			midpoint = (int((centers[0][0] + centers[1][0])/2), int((centers[0][1] + centers[1][1])/2))
 			cv2.circle(frame, midpoint, 5, (0, 255, 0), -1)
@@ -185,11 +187,6 @@ while True:
 			else:
 				print("turn left")
 			'''
-
-	#c = max(cnts, key=cv2.contourArea)
-	#if (contour > size requirement):#--- more than one contour (two tapes)
-	#	contour_angle(frame, cnts)
-
 	# show the frame to our screen
 	cv2.imshow("Frame", frame)
 	key = cv2.waitKey(1) & 0xFF
