@@ -15,9 +15,6 @@ NetworkTables.initialize(server='10.68.29.2');
 
 nwTables = NetworkTables.getTable('Vision')
 
-
-
-
 greenLower = (0,0,250) 
 greenUpper = (100,255,255) 
 
@@ -27,17 +24,12 @@ KNOWN_WIDTH_BTWN_TAPE = 11.0 #inches (not exact)
 obj_points = np.array([[0, 0, 0], [2, 0, 0], [2, 5.75, 0], [0, 5.75, 0]], np.float32)
 
 # paths to the cameraMatrix and distortMatrix files
-cameraMatrix_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/cameraMatrix.pkl"
-distortMatrix_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/distortMatrix.pkl"
-rvecs_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/rvecs.pkl"
-tvecs_filepath = "C:/Users/Miriam/Documents/Computer Vision/Cam Calibrate/tvecs.pkl"
+cameraMatrix_filepath = "cameraMatrix.pkl"
+distortMatrix_filepath = "distortMatrix.pkl"
 
 # opening / loading the cameraMatrix and distortMatrix files
 cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
 distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
-rvec_mtx = pickle.load(open(rvecs_filepath, "rb")) 
-tvec_mtx = pickle.load(open(tvecs_filepath, "rb"))
-#ret = pickle.load(open(ret_filepath, "rb")) 
 
 def get_center(contour):
 	M = cv2.moments(contour)
@@ -192,7 +184,7 @@ while True:
 
 	mid_frame = (int(frame_width / 2), int(frame_height / 2))
 
-	frame = undistort_img(frame, cameraMatrix, distortMatrix) 
+	#frame = undistort_img(frame, cameraMatrix, distortMatrix) 
 	frame_hsv = rid_noise(frame)
 
 	# find contours in thresholded frame, then grab the largest one
@@ -288,12 +280,12 @@ while True:
 				try:
 					for start, end in line_pairs:
 						cv2.line(frame, reprojectdst[start2] / 2, reprojectdst[end] / 2, (0, 0, 255))
-				except:
-					#print("nope")
-					hello = "no"
-			except:
-				#print("no")
-				hello = "nope"
+				except Exception as e:
+					print("nope", e)
+					#hello = "no"
+			except Exception as e:
+				print("no", e)
+				#hello = "nope"
 
 		calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec)
 		
