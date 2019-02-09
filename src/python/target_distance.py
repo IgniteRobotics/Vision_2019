@@ -33,8 +33,8 @@ greenUpper = (90,255,78)
 obj_points = np.array([[0, 0, 0], [2, 0, 0], [2, 5.75, 0], [0, 5.75, 0]], np.float32)
 
 # paths to the cameraMatrix and distortMatrix files
-cameraMatrix_filepath = "cameraMatrix.pkl"
-distortMatrix_filepath = "distortMatrix.pkl"
+cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
+distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
 
 # opening / loading the cameraMatrix and distortMatrix files
 cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
