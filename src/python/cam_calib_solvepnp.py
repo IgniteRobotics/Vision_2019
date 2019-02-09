@@ -303,7 +303,7 @@ while True:
 		print("Distance: " + str(calc_distance))
 		nwTables.putNumber('Distance', calc_distance)
 		print("Angle1: " + str(calc_angle1))
-		nwTables.putNumber('Angle1', str(calc_angle1))
+		nwTables.putNumber('Angle1', calc_angle1)
 
 
 		# show the frame to our screen
