@@ -99,6 +99,27 @@ def compute_output_values(rvec, tvec):
 
 	return distance, angle1, angle2
 
+
+def get_center(contour):
+    M = cv2.moments(contour)
+    cX = int(M["m10"] / M["m00"])
+    cY = int(M["m01"] / M["m00"])
+    return (cX, cY)
+
+def find_best_contour(cnts, mid_frame):
+	sm_Dx = float('inf')
+	best_contour = None
+	for contour in cnts:
+		foundCenter = get_center(contour)
+		Dx = abs(foundCenter[0] - mid_frame) 
+		if(sm_Dx > Dx):
+			sm_Dx = Dx
+			best_contour = contour
+	#return max(cnts, key=cv2.contourArea) 
+	return best_contour
+
+
+
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the (optional) video file")
@@ -133,6 +154,8 @@ while True:
 
 	frame_height, frame_width = frame.shape[:2] # ---------------------------------------------might be nicer way outside of loop
 
+	mid_X_frame = frame_width / 2
+
 	frame_corners = [np.array([0, 0]), np.array([frame_width, 0]), np.array([frame_width, frame_height]), np.array([0, frame_height])]
 
 	size = frame.shape
@@ -157,25 +180,16 @@ while True:
 		print("found contours", len(cnts))
 		
 		# find the biggest contour in the screen (the closest)
-		c = max(cnts, key=cv2.contourArea)
+		c = find_best_contour(cnts, mid_X_frame)
 
 		# acquire corner points of the contour
 		cPoints = get_corners(frame_corners, c)
 
-		# for ever contour in the mask, use it to compute the minimum enclosing circle and centroid
-		for contour in cnts:
-			# finds the radius of contour 
-			((x, y), radius) = cv2.minEnclosingCircle(contour)	
-
-			# find shape of contour using the class shapedetector
-			shape = sd.detect(contour)
-
-			# only proceed if the radius meets a minimum size
-			if(radius > 25 and (shape == "rectangle" or shape == "square")):
-				# then draw the contours on the frame
-				cv2.drawContours(frame, cnts, -1, (0, 255, 0), 2)
-
 		if c is not None and len(c) != 0:
+
+			shape = sd.detect(c)
+
+			cv2.drawContours(frame, [c], -1, (0, 255, 0), 2)
 
 			# draw corner points of largest contour on the frame
 			if((sd.detect(c) == "rectangle") or (sd.detect(c) == "square")):
@@ -187,6 +201,8 @@ while True:
 				frame = cv2.circle(frame, (cPoints[2][0], cPoints[2][1]), 5, (0, 0, 255))
 				# Bottom left point
 				frame = cv2.circle(frame, (cPoints[3][0], cPoints[3][1]), 5, (0, 0, 255))
+
+			
 
 			try:
 				# solvepnp magic
@@ -222,7 +238,6 @@ while True:
 		if(havedisplay):
 			cv2.imshow("frame", frame)
 			key = cv2.waitKey(1) & 0xFF
-			#print("running")
 
 			# if the 'q' key is pressed, stop the loop
 			if key == ord("q"):
