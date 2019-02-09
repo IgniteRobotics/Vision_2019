@@ -10,9 +10,18 @@ import math
 import imutils
 import pickle
 from networktables import NetworkTables
+import os 
+import sys
+
+havedisplay = ('DISPLAY' in os.environ) or os.name =='nt'
+
+if(havedisplay):
+	print("display present")
+else:
+	print("display not present")
 
 # initializes network tables
-NetworkTables.initialize(server='10.68.29.2');
+NetworkTables.initialize(server='10.68.29.2')
 
 nwTables = NetworkTables.getTable('Vision')
 
@@ -210,17 +219,14 @@ while True:
 		nwTables.putNumber('Angle1', calc_angle1)
 
 		# show the frame to our screen
-		cv2.imshow("frame", frame)
+		if(havedisplay):
+			cv2.imshow("frame", frame)
+			key = cv2.waitKey(1) & 0xFF
+			#print("running")
 
-		# if distance is very wrong, save the error frame to a file
-		if calc_distance > 60:
-			cv2.imwrite("wtf.jpg", frame)
-		key = cv2.waitKey(1) & 0xFF
-		#print("running")
-
-		# if the 'q' key is pressed, stop the loop
-		if key == ord("q"):
-			break
+			# if the 'q' key is pressed, stop the loop
+			if key == ord("q"):
+				break
 
 # if we are not using a video file, stop the camera video stream
 if not args.get("video", False):
@@ -231,6 +237,7 @@ else:
 	vs.release()
 
 # close all windows
-cv2.destroyAllWindows()
+if(havedisplay):
+	cv2.destroyAllWindows()
 
 print("okay")
