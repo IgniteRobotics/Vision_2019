@@ -11,7 +11,7 @@ apply from: "credentials.gradle"
 
 // Creates a FileTree object to only pull all .py files within
 // the python folder in directory path for deployment.
-FileTree pytree = fileTree(dir: 'src/python', include: '*.py')
+FileTree pytree = fileTree(dir: 'src/python', include: ['*.py', '*.pkl'])
 FileTree bashtree = fileTree(dir: 'src/bash', include: '*.sh')
 FileTree startuptree = fileTree(dir: 'startup', include: '*.service')
 
