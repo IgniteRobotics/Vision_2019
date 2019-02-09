@@ -35,5 +35,5 @@ class ShapeDetector:
 			shape = "circle"
  
 		# return the name of the shape
-		print (shape)
+		#print (shape)
 		return shape
