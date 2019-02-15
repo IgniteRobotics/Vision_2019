@@ -29,16 +29,18 @@ nwTables = NetworkTables.getTable('Vision')
 greenLower = (0,73,22) 
 greenUpper = (90,255,78) 
 
+TARGET_AIM_OFFSET = 12.0 #24.0 #inches in front of target
+
 # The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
 obj_points = np.array([[0, 0, 0], [2, 0, 0], [2, 5.75, 0], [0, 5.75, 0]], np.float32)
 
 # paths to the cameraMatrix and distortMatrix files
-cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
-distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
+#cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
+#distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
 
 # opening / loading the cameraMatrix and distortMatrix files
-cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
-distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
+#cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
+#distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
 
 def get_corners(corners, contour):
     # We can find the corners of a quadrilateral with sides parallel to the edge of the screen by finding the
@@ -99,12 +101,28 @@ def compute_output_values(rvec, tvec):
 
 	return distance, angle1, angle2
 
-
 def get_center(contour):
     M = cv2.moments(contour)
     cX = int(M["m10"] / M["m00"])
     cY = int(M["m01"] / M["m00"])
     return (cX, cY)
+
+def find_triangle(b_side, c_angle, a_side):
+	#goal: find c_side, a_angle, b_anglec
+	
+	c_side = math.sqrt(a_side**2 + b_side**2 - 2*a_side*b_side*math.cos(c_angle))
+
+	#print('-1 <= x <= 1 : a_angle ', (a_side*math.sin(c_angle))/c_side)
+	try: 
+		print("working")
+		a_angle = math.asin((a_side*math.sin(c_angle))/c_side)
+		#print('-1 <= x <= 1 : c_angle ', (b_side*math.sin(c_angle))/c_side)
+		b_angle = math.asin((b_side*math.sin(c_angle))/c_side)
+	except:
+		print("borking")
+		a_angle = 0
+		b_angle = 0
+	return c_side, a_angle, b_angle
 
 def find_best_contour(cnts, mid_frame):
 	sm_Dx = float('inf')
@@ -120,6 +138,18 @@ def find_best_contour(cnts, mid_frame):
 
 
 
+#axis = np.float32([[6,0,0], [0,6,0], [0,0,6]]).reshape(-1,3)						   
+
+def draw(img, corners, imgpts):
+    corner = tuple(corners[0].ravel())
+    img = cv2.line(img, corner, tuple(imgpts[0].ravel()), (255,0,0), 2)
+    #img = cv2.line(img, corner, tuple(imgpts[1].ravel()), (0,255,0), 2)
+    #img = cv2.line(img, corner, tuple(imgpts[2].ravel()), (0,0,255), 2)
+    return img
+
+
+
+
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the (optional) video file")
@@ -129,7 +159,7 @@ pts = deque(maxlen=args["buffer"])
 
 # if a video path was not supplied, grab the reference to the webcam
 if not args.get("video", False):
-	vs = VideoStream(src=0).start()
+	vs = VideoStream(src="/dev/visioncam").start()
 
 # otherwise, grab a reference to the video file
 else:
@@ -202,25 +232,43 @@ while True:
 				# Bottom left point
 				frame = cv2.circle(frame, (cPoints[3][0], cPoints[3][1]), 5, (0, 0, 255))
 
-			
-
 			try:
 				# solvepnp magic
 				_, rvec, tvec = cv2.solvePnP(obj_points, np.array(cPoints), zero_camera_matrix, zero_distort_matrix)
-				print('tvec', tvec)
+				#print('tvec', tvec)
 					
 			except Exception as e:
 				print("no", e)
 
 		# calculate the distance, angle1 (angle from line directly straight in front of camera to the line straight between the camera and target)
 		calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec)
-		
-		# converts angle1 from radians to degrees
-		calc_angle1 = calc_angle1 * (180 / math.pi)
+		angle3 = 180-(abs(calc_angle1 * (180 / math.pi))+abs(calc_angle2 * (180 / math.pi)))
+		angle3 = angle3 * (math.pi / 180)
 
-		# print the calculated distance in inches and the calculated angle1 in degrees
-		print(calc_distance, calc_angle1)
+		print('distance', calc_distance, 'angle1', calc_angle1, 'angle2', calc_angle2, 'angle3', angle3)
+		print("")
+		# find angles and side of triangle set forwards from target 
+		calc_c_side, calc_a_angle, calc_b_angle = find_triangle(calc_distance, angle3, TARGET_AIM_OFFSET)
+
+		fixed_angleC = abs(angle3 * (180 / math.pi))
+		fixed_angleA = abs(calc_a_angle * (180 / math.pi))
+		fixed_angleB = abs(calc_b_angle * (180 / math.pi))
 		
+		#print("")
+		#print("OG triangle", abs(calc_angle1 * (180 / math.pi)),abs(calc_angle2 * (180 / math.pi)),180-(abs(calc_angle1 * (180 / math.pi))+abs(calc_angle2 * (180 / math.pi))))
+		#print("")
+		#print("sides", calc_c_side, calc_distance, TARGET_AIM_OFFSET)
+		#print("")
+		#print("angles", fixed_angleA, fixed_angleB, fixed_angleC, fixed_angleA+fixed_angleB+fixed_angleC)
+
+		turn1_angle = (calc_angle1 * (180 / math.pi)) - fixed_angleA #calc_a_angle
+		print("turn angle 1", turn1_angle)
+		print("go distance", calc_c_side)
+		turn2_angle = 180 - fixed_angleB # calc_b_angle
+		print("turn angle 2", turn2_angle)
+		print("go distance", TARGET_AIM_OFFSET)
+		print("")
+
 		# finds average distance from the distances calulated (helps remove some error)
 		average = average * frame_count
 		frame_count += 1
@@ -231,7 +279,7 @@ while True:
 		print("Distance: " + str(calc_distance))
 		print("average distance: " + str(average))
 		nwTables.putNumber('Distance', calc_distance)
-		print("Angle1: " + str(calc_angle1))
+		#print("Angle1: " + str(calc_angle1))
 		nwTables.putNumber('Angle1', calc_angle1)
 
 		# show the frame to our screen
