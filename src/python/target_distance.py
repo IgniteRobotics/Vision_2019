@@ -264,7 +264,7 @@ while True:
 		turn1_angle = (calc_angle1 * (180 / math.pi)) - fixed_angleA #calc_a_angle
 		print("turn angle 1", turn1_angle)
 		print("go distance", calc_c_side)
-		turn2_angle = 180 - fixed_angleB # calc_b_angle
+		turn2_angle = 180 - (180 - fixed_angleB) # calc_b_angle
 		print("turn angle 2", turn2_angle)
 		print("go distance", TARGET_AIM_OFFSET)
 		print("")
@@ -275,12 +275,14 @@ while True:
 		average += calc_distance
 		average = average / frame_count
 
-		# print to network tables
 		print("Distance: " + str(calc_distance))
 		print("average distance: " + str(average))
-		nwTables.putNumber('Distance', calc_distance)
-		#print("Angle1: " + str(calc_angle1))
-		nwTables.putNumber('Angle1', calc_angle1)
+
+		# print to network tables
+		nwTables.putNumber('First Turn', turn1_angle)
+		nwTables.putNumber('Distance (side c)', calc_c_side)
+		nwTables.putNumber('Second Turn', turn2_angle)
+		nwTables.putNumber('Distance(=offset)', TARGET_AIM_OFFSET)
 
 		# show the frame to our screen
 		if(havedisplay):
