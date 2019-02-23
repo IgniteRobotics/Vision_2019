@@ -32,10 +32,10 @@ greenUpper = (90,255,78)
 TARGET_AIM_OFFSET = 12.0 #24.0 #inches in front of target
 
 # The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
-left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
-right_obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [1.34, -6.058, 0]], np.float32)
-
-obj_points = left_obj_points
+#left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
+#right_obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [1.34, -6.058, 0]], np.float32)
+#obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [1.945, -0.467, 0]], np.float32)
+#obj_points = left_obj_points
 
 # paths to the cameraMatrix and distortMatrix files
 #cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
@@ -224,7 +224,17 @@ while True:
 	if cnts is not None and (len(cnts) > 0):
 		# prints number of contours found to the monitor 
 		print("found contours", len(cnts))
-		
+
+		for contour in cnts:
+			rect = cv2.minAreaRect(contour)
+			cv2.drawContours(frame, [contour], -1, (0, 255, 0), 2)
+			# calculate coordinates of the minimum area rectangle
+			box = cv2.boxPoints(rect)
+			print(box)
+			# normalize coordinates to integers
+			box = np.int0(box)
+			#print(box)
+		'''
 		# find the biggest contour in the screen (the closest)
 		c = find_best_contour(cnts, mid_X_frame)
 
@@ -308,7 +318,7 @@ while True:
 		nwTables.putNumber('Distance (side c)', calc_c_side)
 		nwTables.putNumber('Second Turn', turn2_angle)
 		nwTables.putNumber('Distance(=offset)', TARGET_AIM_OFFSET)
-
+'''
 		# show the frame to our screen
 		if(havedisplay):
 			cv2.imshow("frame", frame)
