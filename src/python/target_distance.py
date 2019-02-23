@@ -32,7 +32,10 @@ greenUpper = (90,255,78)
 TARGET_AIM_OFFSET = 12.0 #24.0 #inches in front of target
 
 # The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
-obj_points = np.array([[0, 0, 0], [2, 0, 0], [2, 5.75, 0], [0, 5.75, 0]], np.float32)
+left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
+right_obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [1.34, -6.058, 0]], np.float32)
+
+obj_points = left_obj_points
 
 # paths to the cameraMatrix and distortMatrix files
 #cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
@@ -94,10 +97,19 @@ def compute_output_values(rvec, tvec):
 	# horizontal angle between camera center line and target
 	angle1 = math.atan2(x, z)
 
+	inv_tvec = tvec
+	inv_tvec[1][0] = -tvec[1][0]
+	inv_tvec[2][0] = -tvec[2][0]
+
 	rot, _ = cv2.Rodrigues(rvec)
 	rot_inv = rot.transpose()
-	pzero_world = np.matmul(rot_inv, -tvec)
+	pzero_world = np.matmul(rot_inv, inv_tvec)
 	angle2 = math.atan2(pzero_world[0][0], pzero_world[2][0])
+
+	angle_t2 = math.atan2(pzero_world[0][0], pzero_world[1][0])
+	angle_t3 = math.atan2(pzero_world[1][0], pzero_world[2][0])
+
+	print('posed angles:', angle2*180/math.pi, angle_t2*180/math.pi, angle_t3*180/math.pi)
 
 	return distance, angle1, angle2
 
@@ -109,9 +121,7 @@ def get_center(contour):
 
 def find_triangle(b_side, c_angle, a_side):
 	#goal: find c_side, a_angle, b_anglec
-	
 	c_side = math.sqrt(a_side**2 + b_side**2 - 2*a_side*b_side*math.cos(c_angle))
-
 	#print('-1 <= x <= 1 : a_angle ', (a_side*math.sin(c_angle))/c_side)
 	try: 
 		print("working")
@@ -124,15 +134,21 @@ def find_triangle(b_side, c_angle, a_side):
 		b_angle = 0
 	return c_side, a_angle, b_angle
 
+def contour_comparator(a, b):
+	return len(a) > len(b)
+
 def find_best_contour(cnts, mid_frame):
 	sm_Dx = float('inf')
-	best_contour = None
+	best_contour = cnts[0]
 	for contour in cnts:
-		foundCenter = get_center(contour)
-		Dx = abs(foundCenter[0] - mid_frame) 
+		peri = cv2.arcLength(contour, True)
+		if len(cv2.approxPolyDP(contour,0.04 * peri, True)) == 4 and contour_comparator(contour, best_contour):
+			foundCenter = get_center(contour)
+			Dx = abs(foundCenter[0] - mid_frame) 
 		if(sm_Dx > Dx):
 			sm_Dx = Dx
 			best_contour = contour
+	
 	#return max(cnts, key=cv2.contourArea) 
 	return best_contour
 
@@ -215,6 +231,15 @@ while True:
 		# acquire corner points of the contour
 		cPoints = get_corners(frame_corners, c)
 
+		#determine side
+		side = None
+		if (cPoints[0][0] > cPoints[3][0]): #top left is to the right, so it's the left tape.
+			side = "LEFT"
+			obj_points = left_obj_points
+		else:
+			side = "RIGHT"
+			obj_points = right_obj_points
+
 		if c is not None and len(c) != 0:
 
 			shape = sd.detect(c)
@@ -245,7 +270,7 @@ while True:
 		angle3 = 180-(abs(calc_angle1 * (180 / math.pi))+abs(calc_angle2 * (180 / math.pi)))
 		angle3 = angle3 * (math.pi / 180)
 
-		print('distance', calc_distance, 'angle1', calc_angle1, 'angle2', calc_angle2, 'angle3', angle3)
+		print('distance', calc_distance, 'angle1', calc_angle1 *(180/math.pi), 'angle2', calc_angle2 *(180/math.pi)), 'angle3', angle3 *(180/math.pi))
 		print("")
 		# find angles and side of triangle set forwards from target 
 		calc_c_side, calc_a_angle, calc_b_angle = find_triangle(calc_distance, angle3, TARGET_AIM_OFFSET)
