@@ -55,9 +55,9 @@ task deployJetson {
             executeSudo 'systemctl daemon-reload', pty: true, sudoPassword: sshPass, ignoreError: true
 
             // enable so they start automatically.
-            executeSudo 'systemctl enable sortcams.service', pty: true, sudoPassword: sshPass, ignoreError: true
-            executeSudo 'systemctl enable vision.service', pty: true, sudoPassword: sshPass, ignoreError: true
-            executeSudo 'systemctl enable streamcam.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl reenable sortcams.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl reenable vision.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl reenable streamcam.service', pty: true, sudoPassword: sshPass, ignoreError: true
             
             // stop the services but don't stop if this fails.
             executeSudo 'systemctl stop vision', pty: true, sudoPassword: sshPass, ignoreError: true

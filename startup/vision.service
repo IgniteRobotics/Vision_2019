@@ -5,9 +5,14 @@ Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
+User=nvidia
+Group=nvidia
+WorkingDirectory=/home/nvidia/6829/vision/python/
 ExecStartPre=/bin/bash /home/nvidia/6829/vision/bash/config_visioncam.sh
 ExecStart=/usr/bin/python3 /home/nvidia/6829/vision/python/target_distance.py
 StandardInput=tty-force
+StandardOutput=syslog
+StandardError=syslog
 Restart=on-failure
 
 [Install]
