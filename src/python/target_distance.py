@@ -152,20 +152,6 @@ def find_best_contour(cnts, mid_frame):
 	#return max(cnts, key=cv2.contourArea) 
 	return best_contour
 
-
-
-#axis = np.float32([[6,0,0], [0,6,0], [0,0,6]]).reshape(-1,3)						   
-
-def draw(img, corners, imgpts):
-    corner = tuple(corners[0].ravel())
-    img = cv2.line(img, corner, tuple(imgpts[0].ravel()), (255,0,0), 2)
-    #img = cv2.line(img, corner, tuple(imgpts[1].ravel()), (0,255,0), 2)
-    #img = cv2.line(img, corner, tuple(imgpts[2].ravel()), (0,0,255), 2)
-    return img
-
-
-
-
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the (optional) video file")
@@ -219,7 +205,7 @@ while True:
 	# find contours in thresholded frame, then grab the largest one
 	cnts = cv2.findContours(frame_hsv.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	cnts = imutils.grab_contours(cnts)
-	sd = ShapeDetector()
+	sd = ShapeDetector() #--------------------------------------------------clean up
 
 	if cnts is not None and (len(cnts) > 0):
 		# prints number of contours found to the monitor 
@@ -229,7 +215,7 @@ while True:
 		c = find_best_contour(cnts, mid_X_frame)
 
 		# acquire corner points of the contour
-		cPoints = get_corners(frame_corners, c)
+		cPoints = get_corners(frame_corners, c) #----------------------------------use minrect
 
 		#determine side
 		side = None
@@ -260,32 +246,21 @@ while True:
 			try:
 				# solvepnp magic
 				_, rvec, tvec = cv2.solvePnP(obj_points, np.array(cPoints), zero_camera_matrix, zero_distort_matrix)
-				#print('tvec', tvec)
 					
 			except Exception as e:
 				print("no", e)
 
 		# calculate the distance, angle1 (angle from line directly straight in front of camera to the line straight between the camera and target)
 		calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec)
-		angle3 = 180-(abs(calc_angle1 * (180 / math.pi))+abs(calc_angle2 * (180 / math.pi)))
-		angle3 = angle3 * (math.pi / 180)
 
-		print('distance', calc_distance, 'angle1', calc_angle1 *(180/math.pi), 'angle2', calc_angle2 *(180/math.pi), 'angle3', angle3 *(180/math.pi))
+		print('distance', calc_distance, 'angle1', calc_angle1 *(180/math.pi), 'angle2', calc_angle2 *(180/math.pi))
 		print("")
 		# find angles and side of triangle set forwards from target 
-		calc_c_side, calc_a_angle, calc_b_angle = find_triangle(calc_distance, angle3, TARGET_AIM_OFFSET)
+		calc_c_side, calc_a_angle, calc_b_angle = find_triangle(calc_distance, calc_angle2, TARGET_AIM_OFFSET)
 
-		fixed_angleC = abs(angle3 * (180 / math.pi))
 		fixed_angleA = abs(calc_a_angle * (180 / math.pi))
 		fixed_angleB = abs(calc_b_angle * (180 / math.pi))
 		
-		#print("")
-		#print("OG triangle", abs(calc_angle1 * (180 / math.pi)),abs(calc_angle2 * (180 / math.pi)),180-(abs(calc_angle1 * (180 / math.pi))+abs(calc_angle2 * (180 / math.pi))))
-		#print("")
-		#print("sides", calc_c_side, calc_distance, TARGET_AIM_OFFSET)
-		#print("")
-		#print("angles", fixed_angleA, fixed_angleB, fixed_angleC, fixed_angleA+fixed_angleB+fixed_angleC)
-
 		turn1_angle = (calc_angle1 * (180 / math.pi)) - fixed_angleA #calc_a_angle
 		print("turn angle 1", turn1_angle)
 		print("go distance", calc_c_side)
@@ -304,10 +279,10 @@ while True:
 		print("average distance: " + str(average))
 
 		# print to network tables
-		nwTables.putNumber('First Turn', turn1_angle)
-		nwTables.putNumber('Distance (side c)', calc_c_side)
-		nwTables.putNumber('Second Turn', turn2_angle)
-		nwTables.putNumber('Distance(=offset)', TARGET_AIM_OFFSET)
+		nwTables.putNumber('TURN_1', turn1_angle)
+		nwTables.putNumber('DISTANCE_1', calc_c_side)
+		nwTables.putNumber('TURN_2', turn2_angle)
+		nwTables.putNumber('DISTANCE_2', TARGET_AIM_OFFSET)
 
 		# show the frame to our screen
 		if(havedisplay):
