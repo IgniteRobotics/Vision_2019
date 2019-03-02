@@ -38,12 +38,12 @@ right_obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [
 obj_points = left_obj_points
 
 # paths to the cameraMatrix and distortMatrix files
-#cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
-#distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
+cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
+distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
 
 # opening / loading the cameraMatrix and distortMatrix files
-#cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
-#distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
+cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
+distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
 
 def get_corners(corners, contour):
     # We can find the corners of a quadrilateral with sides parallel to the edge of the screen by finding the
@@ -196,7 +196,7 @@ while True:
 	focal_length = size[1]
 	cam_center = (size[1]/2, size[0]/2)
 	zero_camera_matrix = np.array([[focal_length, 0, cam_center[0]],[0, focal_length, cam_center[1]],[0, 0, 1]], dtype=np.float32)
-
+ 
 	zero_distort_matrix = np.zeros((4,1))
 
 	#frame = undistort_img(frame, cameraMatrix, distortMatrix) 
@@ -245,7 +245,7 @@ while True:
 
 			try:
 				# solvepnp magic
-				_, rvec, tvec = cv2.solvePnP(obj_points, np.array(cPoints), zero_camera_matrix, zero_distort_matrix)
+				_, rvec, tvec = cv2.solvePnP(obj_points, np.array(cPoints), cameraMatrix, distortMatrix)#zero_camera_matrix, zero_distort_matrix)
 					
 			except Exception as e:
 				print("no", e)
