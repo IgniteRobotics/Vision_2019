@@ -10,7 +10,7 @@ import math
 import imutils
 import pickle
 from networktables import NetworkTables
-import os 
+import os
 import sys
 
 havedisplay = ('DISPLAY' in os.environ) or os.name =='nt'
@@ -227,7 +227,8 @@ def pickTapePairs(contours, img):
 		#cv2.drawContours(img, [box], 0, (0,0, 255), 3)
 		#print(contour)
 	# print('================')
-	# print(candidates)
+	
+	print("CANIDATES: ", candidates)
 
 	success, top_cornerpoints = find_highest_Y_Pts(candidates)
 	if success:
@@ -345,7 +346,7 @@ while True:
 	if frame is None:
 		break
 
-	frame_height, frame_width = frame.shape[:2] # ---------------------------------------------might be nicer way outside of loop
+	frame_height, frame_width = frame.shape[:2] # --------------------------------------------- might be nicer way outside of loop
 
 	if out is None:
 		out = cv2.VideoWriter('/media/nvidia/3661-3532/output.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 10, (frame_width,frame_height))
