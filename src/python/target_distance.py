@@ -245,7 +245,7 @@ while True:
 
 			try:
 				# solvepnp magic
-				_, rvec, tvec = cv2.solvePnP(obj_points, np.array(cPoints), cameraMatrix, distortMatrix)#zero_camera_matrix, zero_distort_matrix)
+				_, rvec, tvec = cv2.solvePnP(obj_points, np.array(cPoints), cameraMatrix, distortMatrix)
 					
 			except Exception as e:
 				print("no", e)
