@@ -22,9 +22,9 @@ else:
 
 # initializes network tables
 NetworkTables.initialize(server='10.68.29.2')
-
 nwTables = NetworkTables.getTable('Vision')
 
+# initializes out (to be defined later in loop)
 out = None
 
 # hsv color range for LED/reflective tape
@@ -37,7 +37,6 @@ TARGET_AIM_OFFSET = 12.0 #24.0 #inches in front of target
 left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
 right_obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [1.34, -6.058, 0]], np.float32)
 top_obj_points = np.array([[0, 0, 0], [11.89, 0, 0], [9.945, -0.467, 0], [1.945, -0.467, 0]], np.float32)
-#obj_points = left_obj_points
 
 # paths to the cameraMatrix and distortMatrix files
 cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
