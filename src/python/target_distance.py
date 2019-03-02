@@ -25,6 +25,8 @@ NetworkTables.initialize(server='10.68.29.2')
 
 nwTables = NetworkTables.getTable('Vision')
 
+out = None
+
 # hsv color range for LED/reflective tape
 greenLower = (0,73,22) 
 greenUpper = (90,255,78) 
@@ -34,16 +36,16 @@ TARGET_AIM_OFFSET = 12.0 #24.0 #inches in front of target
 # The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
 left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
 right_obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [1.34, -6.058, 0]], np.float32)
-#obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [1.945, -0.467, 0]], np.float32)
-obj_points = left_obj_points
+top_obj_points = np.array([[0, 0, 0], [11.89, 0, 0], [9.945, -0.467, 0], [1.945, -0.467, 0]], np.float32)
+#obj_points = left_obj_points
 
 # paths to the cameraMatrix and distortMatrix files
-#cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
-#distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
+cameraMatrix_filepath = "/home/nvidia/6829/vision/python/cameraMatrix.pkl"
+distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
 
 # opening / loading the cameraMatrix and distortMatrix files
-#cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
-#distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
+cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
+distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
 
 def get_corners(corners, contour):
     # We can find the corners of a quadrilateral with sides parallel to the edge of the screen by finding the
@@ -137,6 +139,162 @@ def find_triangle(b_side, c_angle, a_side):
 def contour_comparator(a, b):
 	return len(a) > len(b)
 
+def find_highest_Y_Pts(candidates):
+	print('Finding highest Y pts for', len(candidates), 'contours')
+	to_ret = []
+	try:
+		for i in range(2):
+			minY = math.inf
+			minPt = []
+			minYIdx = 0
+			for i, element in enumerate(candidates):
+				if (element[0][1] < minY):
+					minY = element[0][1]	
+					minPt = element
+					minYIdx = i
+			del(candidates[minYIdx])
+			to_ret.append(minPt[0])
+			to_ret.append(minPt[1])
+
+		return True, np.array((to_ret[0],to_ret[2],to_ret[3],to_ret[1]))
+	except Exception as e:
+		print ('Failed to find points', str(e))
+		return False, None
+
+def slope(x1, y1, x2, y2):
+	return np.rad2deg(np.arctan2(y2 - y1, x2 - x1))
+    #return (y2-y1)/(x2-x1)
+
+def pickTapePairs(contours, img):
+	candidates = []
+	for contour in contours:
+		#print('==== contour ====')
+		perimeter = cv2.arcLength(contour,True)
+		epsilon = 0.01*cv2.arcLength(contour,True)
+		approx = cv2.approxPolyDP(contour,epsilon,True)
+		#print ('length:', len(approx))
+		area = cv2.contourArea(contour)
+		#print ('area:', area)
+		rect = cv2.minAreaRect(contour)
+		# calculate coordinates of the minimum area rectangle
+		box = cv2.boxPoints(rect)
+		# normalize coordinates to integers
+		box = np.int0(box)
+		#print('box: ',box)
+		minY = math.inf
+		minYIndex = 0
+		# find the highest point (minY)
+		for i in range(len(box)):
+			if box[i][1] < minY:
+				minY = box[i][1]
+				minYIndex = i
+		
+		highestPt = (box[minYIndex][0],box[minYIndex][1])
+
+		#find grab the next and prev points for slopes
+		prevPtIndex = minYIndex -1
+		nextPtIndex = minYIndex +1
+		if prevPtIndex == -1:
+			prevPtIndex = 3
+		if nextPtIndex == 4:
+			nextPtIndex = 0
+
+		#determine which one is closest to the Y factor of our point
+		nextHighestPt = (box[prevPtIndex][0],box[prevPtIndex][1])
+		if box[nextPtIndex][1] < nextHighestPt[1]:
+			nextHighestPt = (box[nextPtIndex][0],box[nextPtIndex][1])
+
+		topSlope = slope(highestPt[0],highestPt[1], nextHighestPt[0],nextHighestPt[1])
+		
+		print('==== contour ====')		
+		print('highestPt:', minYIndex, highestPt[0],highestPt[1])
+		print('nextHighestPt:', nextHighestPt[0],nextHighestPt[1])
+		print('slope:', topSlope)
+
+		if topSlope > 90:
+			topSlope = 180 - topSlope
+		if topSlope > 20 or topSlope < 9:  
+			print('Removing this contour.  Slope', topSlope, 'too tall')
+			continue
+
+		if area < 1500:
+			print('Removing this contour.  Area', area, 'too small')
+			continue 
+
+		candidates.append((highestPt, nextHighestPt))
+		# draw contours
+		print(type(box))
+		print(box)
+		#cv2.drawContours(img, [box], 0, (0,0, 255), 3)
+		#print(contour)
+	# print('================')
+	# print(candidates)
+
+	success, top_cornerpoints = find_highest_Y_Pts(candidates)
+	if success:
+		print ('top corner points:', top_cornerpoints)
+		min_rect = cv2.minAreaRect(np.array(top_cornerpoints))
+		(center, (w,h), theta) = min_rect
+		ar = w / float(h)
+		print ('top of targets aspect ratio:', str(ar))
+
+		cv2.drawContours(img, [top_cornerpoints], 0, (0,255, 0), 3)
+
+		return np.array(top_cornerpoints), img
+	else:
+		return None, img
+
+def pickFullOrTopCnt(frame, c, corners):
+
+	print ('Current single target', c.shape)
+	min_rect = cv2.minAreaRect(c)
+	(center, (w,h), theta) = min_rect
+	ar = w / float(h)
+	print ('Single target aspect ratio:', str(ar))
+
+	# if the single target found is close to a tape (aspect ration 2.75) then use it
+	# otherwise, use the top target.
+	target_pts = None
+	cornerPoints = None
+	side = "???"
+	if ar > 2.3 and ar < 3.0:
+		print ('USING SINGLE TARGET TAPE')
+			# find the corners of the contour
+		cornerPoints = get_corners(corners, c)
+		print('corner point type', type(cornerPoints))
+
+		# print ('corners: \nshape (as np.array)', np.array(cornerPoints).shape, '\npoints', cornerPoints)
+		target_pts = np.array(cornerPoints)
+
+		#set the points for solvepnp
+		#obj_points = left_obj_points
+
+		#determine side
+		side = None
+		if (target_pts[0][0] > target_pts[3][0]): #top left is to the right, so it's the left tape.
+			side = "LEFT"
+			obj_points = left_obj_points
+			print ('Using Left Side')
+		else:
+			side = "RIGHT"
+			obj_points = right_obj_points
+			print ('Using Right Side')
+		
+		return target_pts, obj_points 
+
+	else:		
+		print ('USING TOPS OF TARGET TAPES')
+		cTopPts, frame = pickTapePairs(cnts, frame)
+		if cTopPts is not None:
+			print ('Current top tape', cTopPts.shape)
+			target_pts= np.array(cTopPts)
+			#set the points for solvepnp
+			obj_points = top_obj_points
+			side = "TOP"
+			return target_pts, obj_points
+		else:
+			return None, None 
+
 def find_best_contour(cnts, mid_frame):
 	sm_Dx = float('inf')
 	best_contour = cnts[0]
@@ -151,6 +309,9 @@ def find_best_contour(cnts, mid_frame):
 	
 	#return max(cnts, key=cv2.contourArea) 
 	return best_contour
+
+
+###################### MAIN LOOP ######################
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -174,6 +335,7 @@ time.sleep(2.0)
 average = 0
 frame_count=0
 while True:
+	print("#################################################################################################")
 	# grab the current frame
 	frame = vs.read()
 
@@ -185,6 +347,9 @@ while True:
 		break
 
 	frame_height, frame_width = frame.shape[:2] # ---------------------------------------------might be nicer way outside of loop
+
+	if out is None:
+		out = cv2.VideoWriter('/media/nvidia/3661-3532/output.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 10, (frame_width,frame_height))
 
 	mid_X_frame = frame_width / 2
 
@@ -214,38 +379,25 @@ while True:
 		# find the biggest contour in the screen (the closest)
 		c = find_best_contour(cnts, mid_X_frame)
 
-		# acquire corner points of the contour
-		cPoints = get_corners(frame_corners, c) #----------------------------------use minrect
+		target_pts, obj_points = pickFullOrTopCnt(frame, c, frame_corners)
 
-		#determine side
-		side = None
-		if (cPoints[0][0] > cPoints[3][0]): #top left is to the right, so it's the left tape.
-			side = "LEFT"
-			obj_points = left_obj_points
-		else:
-			side = "RIGHT"
-			obj_points = right_obj_points
+		if target_pts is not None and len(target_pts) != 0:
 
-		if c is not None and len(c) != 0:
+			#cv2.drawContours(frame, [target_pts], -1, (0, 255, 0), 2)
 
-			shape = sd.detect(c)
-
-			cv2.drawContours(frame, [c], -1, (0, 255, 0), 2)
-
-			# draw corner points of largest contour on the frame
-			if((sd.detect(c) == "rectangle") or (sd.detect(c) == "square")):
-				# Top left point
-				frame = cv2.circle(frame, (cPoints[0][0], cPoints[0][1]), 5, (0, 0, 255))
-				# Top right point
-				frame = cv2.circle(frame, (cPoints[1][0], cPoints[1][1]), 5, (0, 0, 255))
-				# Bottom right point
-				frame = cv2.circle(frame, (cPoints[2][0], cPoints[2][1]), 5, (0, 0, 255))
-				# Bottom left point
-				frame = cv2.circle(frame, (cPoints[3][0], cPoints[3][1]), 5, (0, 0, 255))
+			# Top left point
+			frame = cv2.circle(frame, (target_pts[0][0], target_pts[0][1]), 5, (0, 0, 255))
+			# Top right point
+			frame = cv2.circle(frame, (target_pts[1][0], target_pts[1][1]), 5, (0, 255, 0))
+			# Bottom right point
+			frame = cv2.circle(frame, (target_pts[2][0], target_pts[2][1]), 5, (255, 0, 0))
+			# Bottom left point
+			frame = cv2.circle(frame, (target_pts[3][0], target_pts[3][1]), 5, (255, 255, 255))
 
 			try:
 				# solvepnp magic
-				_, rvec, tvec = cv2.solvePnP(obj_points, np.array(cPoints), zero_camera_matrix, zero_distort_matrix)
+				_, rvec, tvec = cv2.solvePnP(obj_points, target_pts.astype('float32'), cameraMatrix, distortMatrix)
+				#_, rvec, tvec = cv2.solvePnP(obj_points, target_pts.astype('float32'), zero_camera_matrix, zero_distort_matrix)
 					
 			except Exception as e:
 				print("no", e)
@@ -284,6 +436,8 @@ while True:
 		nwTables.putNumber('TURN_2', turn2_angle)
 		nwTables.putNumber('DISTANCE_2', TARGET_AIM_OFFSET)
 
+		out.write(frame)
+
 		# show the frame to our screen
 		if(havedisplay):
 			cv2.imshow("frame", frame)
@@ -300,6 +454,7 @@ if not args.get("video", False):
 # otherwise, release the camera
 else:
 	vs.release()
+	out.release()
 
 # close all windows
 if(havedisplay):
