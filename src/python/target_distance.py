@@ -31,7 +31,11 @@ out = None
 greenLower = (0,73,22) 
 greenUpper = (90,255,78) 
 
-TARGET_AIM_OFFSET = 12.0 #24.0 #inches in front of target
+X_OFFSET = 6.0              # inches to midpoint (default left)
+X_OFFSET_LEFT = 6.0         # inches to midpoint
+X_OFFSET_RIGHT = -4.055     # inches to midpoint 
+Z_OFFSET = -21.0            # inches from camera to bumper
+TARGET_AIM_OFFSET = 12.0    # 24.0 #inches in front of target
 
 # The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
 left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
@@ -86,8 +90,12 @@ def rid_noise(img):
 	thresh = cv2.dilate(thresh, None, iterations=2)
 	return thresh
 
-def compute_output_values(rvec, tvec):
+def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET):
 	'''Compute the necessary output distance and angles'''
+	# adjust tvec for offsets
+	tvec[0] += X_OFFSET
+	tvec[2] += Z_OFFSET
+	
 	# The tilt angle only affects the distance and angle1 calcs
 	x = tvec[0][0]
 	z = tvec[2][0]
@@ -271,18 +279,17 @@ def pickFullOrTopCnt(frame, c, corners):
 		# print ('corners: \nshape (as np.array)', np.array(cornerPoints).shape, '\npoints', cornerPoints)
 		target_pts = np.array(cornerPoints)
 
-		#set the points for solvepnp
-		#obj_points = left_obj_points
-
 		#determine side
 		side = None
 		if (target_pts[0][0] > target_pts[3][0]): #top left is to the right, so it's the left tape.
 			side = "LEFT"
 			obj_points = left_obj_points
+			X_OFFSET = X_OFFSET_LEFT
 			print ('Using Left Side')
 		else:
 			side = "RIGHT"
 			obj_points = right_obj_points
+			X_OFFSET = X_OFFSET_RIGHT
 			print ('Using Right Side')
 		
 		return target_pts, obj_points 
@@ -295,6 +302,7 @@ def pickFullOrTopCnt(frame, c, corners):
 			target_pts= np.array(cTopPts)
 			#set the points for solvepnp
 			obj_points = top_obj_points
+			X_OFFSET = X_OFFSET_LEFT
 			side = "TOP"
 			return target_pts, obj_points
 		else:
@@ -339,6 +347,8 @@ time.sleep(2.0)
 # keep looping
 average = 0
 frame_count=0
+rvec = None
+tvec = None
 while True:
 	print("#################################################################################################")
 	# grab the current frame
@@ -406,12 +416,15 @@ while True:
 				# solvepnp magic
 				_, rvec, tvec = cv2.solvePnP(obj_points, target_pts.astype('float32'), cameraMatrix, distortMatrix)
 				#_, rvec, tvec = cv2.solvePnP(obj_points, target_pts.astype('float32'), zero_camera_matrix, zero_distort_matrix)
-					
+				print("TVEC:  ", tvec)
 			except Exception as e:
 				print("no", e)
+				continue
+		else: # nothing found
+			continue
 
 		# calculate the distance, angle1 (angle from line directly straight in front of camera to the line straight between the camera and target)
-		calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec)
+		calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET)
 
 		print('distance', calc_distance, 'angle1', calc_angle1 *(180/math.pi), 'angle2', calc_angle2 *(180/math.pi))
 		print("")
