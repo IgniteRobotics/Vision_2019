@@ -248,8 +248,13 @@ def pickFullOrTopCnt(frame, c, corners):
 
 	print ('Current single target', c.shape)
 	min_rect = cv2.minAreaRect(c)
-	(center, (w,h), theta) = min_rect
-	ar = w / float(h)
+	(center, (w,h), theta) = min_rect 
+	
+	if(w > h):
+		ar = w / float(h)
+	else:
+		ar = h / float(w)
+
 	print ('Single target aspect ratio:', str(ar))
 
 	# if the single target found is close to a tape (aspect ration 2.75) then use it
@@ -348,8 +353,11 @@ while True:
 
 	frame_height, frame_width = frame.shape[:2] # --------------------------------------------- might be nicer way outside of loop
 
-	if out is None:
-		out = cv2.VideoWriter('/media/nvidia/3661-3532/output.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 10, (frame_width,frame_height))
+	try:
+		if out is None:
+			out = cv2.VideoWriter('/media/nvidia/3661-3532/output.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 10, (frame_width,frame_height))
+	except:
+		out = None
 
 	mid_X_frame = frame_width / 2
 
@@ -436,7 +444,8 @@ while True:
 		nwTables.putNumber('TURN_2', turn2_angle)
 		nwTables.putNumber('DISTANCE_2', TARGET_AIM_OFFSET)
 
-		out.write(frame)
+		if out is not None:
+			out.write(frame)
 
 		# show the frame to our screen
 		if(havedisplay):
@@ -454,7 +463,8 @@ if not args.get("video", False):
 # otherwise, release the camera
 else:
 	vs.release()
-	out.release()
+	if out is not None:
+		out.release()
 
 # close all windows
 if(havedisplay):
