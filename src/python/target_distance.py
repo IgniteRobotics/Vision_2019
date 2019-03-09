@@ -526,13 +526,13 @@ while True:
 		[turn1_angle, calc_c_side, turn2_angle, goDist2, calc_distance, direct_turn] = vertical_array_avg(window)
 
 		# draw the values at the top-left corner
-		cv2.putText(frame, "Turn Angle 1: ",int(turn1_angle), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
-		cv2.putText(frame, "Go Distance 1: ",int(calc_c_side), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
-		cv2.putText(frame, "Turn Angle 2: ",int(turn2_angle), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
-		cv2.putText(frame, "Go Distance 2: ",int(goDist2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
-		cv2.putText(frame, "Direct Distance: ",int(calc_distance), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
-		cv2.putText(frame, "Direct Turn: ",int(direct_turn), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
-
+		cv2.putText(frame, "Turn Angle 1: " + "{:7.2f}".format(turn1_angle), (20, 20), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+    	cv2.putText(frame, "Go Distance 1: " + "{:7.2f}".format(calc_c_side), (20, 50), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Turn Angle 2: " + "{:7.2f}".format(turn2_angle), (20, 80), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Go Distance 2: " + "{:7.2f}".format(goDist2), (20, 110), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Direct Distance: " + "{:7.2f}".format(calc_distance), (20, 140), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Direct Turn: " + "{:7.2f}".format(direct_turn), (20, 170), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		
 		print("turn angle 1", turn1_angle) 	
 		print("go distance", calc_c_side)
 		print("turn angle 2", turn2_angle)
