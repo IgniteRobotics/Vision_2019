@@ -50,23 +50,41 @@ distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
 cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
 distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
 
-def get_corners(corners, contour):
-    # We can find the corners of a quadrilateral with sides parallel to the edge of the screen by finding the
-    # points on the contour that are closest to each corner of the screen.
+def dist_array(pt_array, pts_array):
+	sorted_ls = []
+	print("single point array: ", pt_array)
+	print("points array: ", pts_array)
+	for pt in pts_array:
+		sorted_ls.append(np.linalg.norm(pt_array[0] - pt))
+	print("sorted list: ", sorted_ls)
+	return sorted_ls
+	#return 2pts in array
 
-    # Initialize the minimum distance to each corner, and which point is at that distance.
-    min_dist = [math.inf, math.inf, math.inf, math.inf]
-    to_ret = [None, None, None, None]
-
-    # Check distances for every point
-    for point in contour:
-        for i in range(4):
-            # norm is the generalized version of the distance formula.
-            dist = np.linalg.norm(point[0] - corners[i])
-            if dist < min_dist[i]:
-                min_dist[i] = dist
-                to_ret[i] = np.array(point[0], dtype=np.float32)
-    return to_ret
+def order_points(pts):
+	# sort the points based on their x-coordinates
+	xSorted = pts[np.argsort(pts[:, 0]), :]
+ 
+	# grab the left-most and right-most points from the sorted x-roodinate points
+	leftMost = xSorted[:2, :]
+	rightMost = xSorted[2:, :]
+ 
+	# now, sort the left-most coordinates according to their
+	# y-coordinates so we can grab the top-left and bottom-left
+	# points, respectively
+	leftMost = leftMost[np.argsort(leftMost[:, 1]), :]
+	(tl, bl) = leftMost
+ 
+	# now that we have the top-left coordinate, use it as an
+	# anchor to calculate the Euclidean distance between the
+	# top-left and right-most points; by the Pythagorean
+	# theorem, the point with the largest distance will be
+	# our bottom-right point
+	D = dist_array(tl[np.newaxis],rightMost)
+	(br, tr) = rightMost[np.argsort(D)[::-1], :]
+ 
+	# return the coordinates in top-left, top-right,
+	# bottom-right, and bottom-left order
+	return np.array([tl, tr, br, bl], dtype="float32")
 
 def undistort_img(img, cameraMatrix, distortMatrix):
 	h, w = img.shape[:2]
@@ -273,7 +291,21 @@ def pickFullOrTopCnt(frame, c, corners):
 	if ar > 2.3 and ar < 3.0:
 		print ('USING SINGLE TARGET TAPE')
 			# find the corners of the contour
-		cornerPoints = get_corners(corners, c)
+
+		min_rect = cv2.minAreaRect(c)
+		print("C", c)
+		box_pts = cv2.boxPoints(min_rect)
+		print("BOX POINTS: ", box_pts)
+		# normalize coordinates to integers
+		min_rect = np.int0(box_pts)
+		print("INT: ", min_rect)
+		my_box = min_rect.reshape((-1,1,2))
+		cv2.polylines(frame, [my_box], True, (0,255,255))
+		#min_rect = np.array(min_rect)
+		#print("NP ARRAY: ", min_rect)
+		#min_rect = min_rect.astype('float32')
+
+		cornerPoints = order_points(box_pts) #np.array(min_rect))
 		print('corner point type', type(cornerPoints))
 
 		# print ('corners: \nshape (as np.array)', np.array(cornerPoints).shape, '\npoints', cornerPoints)
