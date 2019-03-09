@@ -1,7 +1,6 @@
 from collections import deque
 from imutils.video import VideoStream
 from imutils import paths
-from shapedetector import ShapeDetector
 import numpy as np
 import argparse
 import time
@@ -62,8 +61,7 @@ def dist_array(pt_array, pts_array):
 	for pt in pts_array:
 		sorted_ls.append(np.linalg.norm(pt_array[0] - pt))
 	print("sorted list: ", sorted_ls)
-	return sorted_ls
-	#return 2pts in array
+	return sorted_ls #2 points in array returned
 
 def order_points(pts):
 	# sort the points based on their x-coordinates
@@ -111,15 +109,14 @@ def top_order_points(pts):
 	# bottom-right, and bottom-left order
 	return np.array([tl, tr, br, bl], dtype="float32")
 
-#pushes array v onto 2d array window,
-#then slices a to maintain its original size
+# pushes array values onto 2d array window, then slices window to maintain its original size
 def window_push(window, values):
     i,j = window.shape
     a = np.vstack((window,values))
     a = a[-i:]
     return a
 
-#column-wise average of a 2d array
+# column-wise average of a 2d array
 def vertical_array_avg(window_array):
     return window_array.mean(axis=0)
 
@@ -151,7 +148,7 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET):
 	tvec[0] += X_OFFSET
 	tvec[2] += Z_OFFSET
 	
-	# The tilt angle only affects the distance and angle1 calcs
+	# declaring our x and z based on tvec
 	x = tvec[0][0]
 	z = tvec[2][0]
 
@@ -175,6 +172,7 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET):
 
 	print('posed angles:', angle2*180/math.pi, angle_t2*180/math.pi, angle_t3*180/math.pi)
 
+	# returns distance to target, angle from front of camera to target, and angle from front of target to camera
 	return distance, angle1, angle2
 
 def get_center(contour):
@@ -330,7 +328,6 @@ def pickFullOrTopCnt(frame, c, corners):
 			ar = h / float(w)
 	except:
 		print("ar failed")
-	
 
 	print ('Single target aspect ratio:', str(ar))
 
@@ -473,8 +470,7 @@ while True:
 	# find contours in thresholded frame, then grab the largest one
 	cnts = cv2.findContours(frame_hsv.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	cnts = imutils.grab_contours(cnts)
-	sd = ShapeDetector() #--------------------------------------------------clean up
-
+	
 	if cnts is not None and (len(cnts) > 0):
 		# prints number of contours found to the monitor 
 		print("found contours", len(cnts))
@@ -528,6 +524,14 @@ while True:
 		
 		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET, calc_distance, direct_turn])
 		[turn1_angle, calc_c_side, turn2_angle, goDist2, calc_distance, direct_turn] = vertical_array_avg(window)
+
+		# draw the values at the top-left corner
+		cv2.putText(frame, "Turn Angle 1: ",int(turn1_angle), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+		cv2.putText(frame, "Go Distance 1: ",int(calc_c_side), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+		cv2.putText(frame, "Turn Angle 2: ",int(turn2_angle), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+		cv2.putText(frame, "Go Distance 2: ",int(goDist2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+		cv2.putText(frame, "Direct Distance: ",int(calc_distance), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+		cv2.putText(frame, "Direct Turn: ",int(direct_turn), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
 
 		print("turn angle 1", turn1_angle) 	
 		print("go distance", calc_c_side)
