@@ -31,11 +31,16 @@ out = None
 greenLower = (0,73,22) 
 greenUpper = (90,255,78) 
 
+MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
+
 X_OFFSET = 6.0              # inches to midpoint (default left)
 X_OFFSET_LEFT = 6.0         # inches to midpoint
 X_OFFSET_RIGHT = -4.055     # inches to midpoint 
 Z_OFFSET = -21.0            # inches from camera to bumper
 TARGET_AIM_OFFSET = 12.0    # 24.0 #inches in front of target
+
+SLIDER_WINDOW = 10 			# number of frames to average accross
+SLIDER_VALUES = 4 			# number of vaules to average accross
 
 # The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
 left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
@@ -85,6 +90,38 @@ def order_points(pts):
 	# return the coordinates in top-left, top-right,
 	# bottom-right, and bottom-left order
 	return np.array([tl, tr, br, bl], dtype="float32")
+
+def top_order_points(pts):
+	# sort the points based on their x-coordinates
+	xSorted = pts[np.argsort(pts[:, 0]), :]
+ 
+	# grab the left-most and right-most points from the sorted x-roodinate points
+	leftMost = xSorted[:2, :]
+	rightMost = xSorted[2:, :]
+ 
+	# now, sort the left-most coordinates according to their
+	# y-coordinates so we can grab the top-left and bottom-left
+	# points, respectively
+	leftMost = leftMost[np.argsort(leftMost[:, 1]), :]
+	(tl, bl) = leftMost
+ 
+	(tr, br) = rightMost[np.argsort(rightMost[:, 1]), :]
+ 
+	# return the coordinates in top-left, top-right,
+	# bottom-right, and bottom-left order
+	return np.array([tl, tr, br, bl], dtype="float32")
+
+#pushes array v onto 2d array window,
+#then slices a to maintain its original size
+def window_push(window, values):
+    i,j = window.shape
+    a = np.vstack((window,values))
+    a = a[-i:]
+    return a
+
+#column-wise average of a 2d array
+def vertical_array_avg(window_array):
+    return window_array.mean(axis=0)
 
 def undistort_img(img, cameraMatrix, distortMatrix):
 	h, w = img.shape[:2]
@@ -180,8 +217,9 @@ def find_highest_Y_Pts(candidates):
 			del(candidates[minYIdx])
 			to_ret.append(minPt[0])
 			to_ret.append(minPt[1])
-
-		return True, np.array((to_ret[0],to_ret[2],to_ret[3],to_ret[1]))
+		print("to return: ", to_ret)
+		to_ret = top_order_points(np.array(to_ret))
+		return True, np.int0(to_ret) #np.array((to_ret[0],to_ret[2],to_ret[3],to_ret[1]))
 	except Exception as e:
 		print ('Failed to find points', str(e))
 		return False, None
@@ -192,20 +230,23 @@ def slope(x1, y1, x2, y2):
 
 def pickTapePairs(contours, img):
 	candidates = []
+	for cnt in contours:
+		cv2.drawContours(img, [cnt], 0, (255,255, 255), 3)
 	for contour in contours:
-		#print('==== contour ====')
+		print('==== contour ====')
 		perimeter = cv2.arcLength(contour,True)
 		epsilon = 0.01*cv2.arcLength(contour,True)
 		approx = cv2.approxPolyDP(contour,epsilon,True)
-		#print ('length:', len(approx))
+		print ('length:', len(approx))
 		area = cv2.contourArea(contour)
-		#print ('area:', area)
+		print ('area:', area)
 		rect = cv2.minAreaRect(contour)
 		# calculate coordinates of the minimum area rectangle
 		box = cv2.boxPoints(rect)
 		# normalize coordinates to integers
 		box = np.int0(box)
-		#print('box: ',box)
+		print('box: ',box)
+		cv2.polylines(frame, [box], True, (0,255,255))
 		minY = math.inf
 		minYIndex = 0
 		# find the highest point (minY)
@@ -236,13 +277,13 @@ def pickTapePairs(contours, img):
 		print('nextHighestPt:', nextHighestPt[0],nextHighestPt[1])
 		print('slope:', topSlope)
 
-		if topSlope > 90:
-			topSlope = 180 - topSlope
-		if topSlope > 20 or topSlope < 9:  
-			print('Removing this contour.  Slope', topSlope, 'too tall')
-			continue
+		#if topSlope > 90:
+		#	topSlope = 180 - topSlope
+		#if topSlope > 20 or topSlope < 9:  
+		#	print('Removing this contour.  Slope', topSlope, 'too tall')
+		#	continue
 
-		if area < 1500:
+		if area < 150:
 			print('Removing this contour.  Area', area, 'too small')
 			continue 
 
@@ -255,31 +296,40 @@ def pickTapePairs(contours, img):
 	# print('================')
 	
 	print("CANIDATES: ", candidates)
-
+	
 	success, top_cornerpoints = find_highest_Y_Pts(candidates)
 	if success:
+		ar = 100
 		print ('top corner points:', top_cornerpoints)
 		min_rect = cv2.minAreaRect(np.array(top_cornerpoints))
 		(center, (w,h), theta) = min_rect
-		ar = w / float(h)
+		try:
+			ar = w / float(h)
+		except:
+			print("ar failed")
+
 		print ('top of targets aspect ratio:', str(ar))
 
-		cv2.drawContours(img, [top_cornerpoints], 0, (0,255, 0), 3)
+		cv2.drawContours(img, [top_cornerpoints], 0, (0,255, 0), 1)
 
 		return np.array(top_cornerpoints), img
 	else:
 		return None, img
 
 def pickFullOrTopCnt(frame, c, corners):
-
+	ar = 100
+	
 	print ('Current single target', c.shape)
 	min_rect = cv2.minAreaRect(c)
 	(center, (w,h), theta) = min_rect 
+	try:
+		if(w > h):
+			ar = w / float(h)
+		else:
+			ar = h / float(w)
+	except:
+		print("ar failed")
 	
-	if(w > h):
-		ar = w / float(h)
-	else:
-		ar = h / float(w)
 
 	print ('Single target aspect ratio:', str(ar))
 
@@ -301,9 +351,6 @@ def pickFullOrTopCnt(frame, c, corners):
 		print("INT: ", min_rect)
 		my_box = min_rect.reshape((-1,1,2))
 		cv2.polylines(frame, [my_box], True, (0,255,255))
-		#min_rect = np.array(min_rect)
-		#print("NP ARRAY: ", min_rect)
-		#min_rect = min_rect.astype('float32')
 
 		cornerPoints = order_points(box_pts) #np.array(min_rect))
 		print('corner point type', type(cornerPoints))
@@ -345,12 +392,12 @@ def find_best_contour(cnts, mid_frame):
 	best_contour = cnts[0]
 	for contour in cnts:
 		peri = cv2.arcLength(contour, True)
-		if len(cv2.approxPolyDP(contour,0.04 * peri, True)) == 4:
-			foundCenter = get_center(contour)
-			Dx = abs(foundCenter[0] - mid_frame) 
-			if(sm_Dx > Dx):
-				sm_Dx = Dx
-				best_contour = contour
+		#if len(cv2.approxPolyDP(contour,0.04 * peri, True)) == 4:
+		foundCenter = get_center(contour)
+		Dx = abs(foundCenter[0] - mid_frame) 
+		if(sm_Dx > Dx):
+			sm_Dx = Dx
+			best_contour = contour
 	
 	#return max(cnts, key=cv2.contourArea) 
 	return best_contour
@@ -381,6 +428,7 @@ average = 0
 frame_count=0
 rvec = None
 tvec = None
+window = np.zeros((SLIDER_WINDOW, SLIDER_VALUES), dtype=np.float32)
 while True:
 	print("#################################################################################################")
 	# grab the current frame
@@ -435,7 +483,7 @@ while True:
 
 			#cv2.drawContours(frame, [target_pts], -1, (0, 255, 0), 2)
 
-			# Top left point
+			# Top left point (RED)
 			frame = cv2.circle(frame, (target_pts[0][0], target_pts[0][1]), 5, (0, 0, 255))
 			# Top right point
 			frame = cv2.circle(frame, (target_pts[1][0], target_pts[1][1]), 5, (0, 255, 0))
@@ -467,11 +515,15 @@ while True:
 		fixed_angleB = abs(calc_b_angle * (180 / math.pi))
 		
 		turn1_angle = (calc_angle1 * (180 / math.pi)) - fixed_angleA #calc_a_angle
-		print("turn angle 1", turn1_angle)
-		print("go distance", calc_c_side)
 		turn2_angle = 180 - (180 - fixed_angleB) # calc_b_angle
+		
+		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET])
+		[turn1_angle, calc_c_side, turn2_angle, goDist2] = vertical_array_avg(window)
+
+		print("turn angle 1", turn1_angle) 	
+		print("go distance", calc_c_side)
 		print("turn angle 2", turn2_angle)
-		print("go distance", TARGET_AIM_OFFSET)
+		print("go distance", goDist2)
 		print("")
 
 		# finds average distance from the distances calulated (helps remove some error)
@@ -487,7 +539,7 @@ while True:
 		nwTables.putNumber('TURN_1', turn1_angle)
 		nwTables.putNumber('DISTANCE_1', calc_c_side)
 		nwTables.putNumber('TURN_2', turn2_angle)
-		nwTables.putNumber('DISTANCE_2', TARGET_AIM_OFFSET)
+		nwTables.putNumber('DISTANCE_2', goDist2)
 
 		if out is not None:
 			out.write(frame)
