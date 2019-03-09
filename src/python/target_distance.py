@@ -37,10 +37,10 @@ X_OFFSET = 6.0              # inches to midpoint (default left)
 X_OFFSET_LEFT = 6.0         # inches to midpoint
 X_OFFSET_RIGHT = -4.055     # inches to midpoint 
 Z_OFFSET = -21.0            # inches from camera to bumper
-TARGET_AIM_OFFSET = 12.0    # 24.0 #inches in front of target
+TARGET_AIM_OFFSET = 24.0    # 24.0 #inches in front of target
 
-SLIDER_WINDOW = 10 			# number of frames to average accross
-SLIDER_VALUES = 4 			# number of vaules to average accross
+SLIDER_WINDOW = 30 			# number of frames to average accross
+SLIDER_VALUES = 6 			# number of vaules to average accross
 
 # The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
 left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
@@ -322,6 +322,7 @@ def pickFullOrTopCnt(frame, c, corners):
 	print ('Current single target', c.shape)
 	min_rect = cv2.minAreaRect(c)
 	(center, (w,h), theta) = min_rect 
+	print('single target w/h',w,h)
 	try:
 		if(w > h):
 			ar = w / float(h)
@@ -338,12 +339,12 @@ def pickFullOrTopCnt(frame, c, corners):
 	target_pts = None
 	cornerPoints = None
 	side = "???"
-	if ar > 2.3 and ar < 3.0:
+	if ar > 1 and ar < 100:
 		print ('USING SINGLE TARGET TAPE')
 			# find the corners of the contour
 
 		min_rect = cv2.minAreaRect(c)
-		print("C", c)
+		#print("C", c)
 		box_pts = cv2.boxPoints(min_rect)
 		print("BOX POINTS: ", box_pts)
 		# normalize coordinates to integers
@@ -392,7 +393,11 @@ def find_best_contour(cnts, mid_frame):
 	best_contour = cnts[0]
 	for contour in cnts:
 		peri = cv2.arcLength(contour, True)
-		#if len(cv2.approxPolyDP(contour,0.04 * peri, True)) == 4:
+		area = cv2.contourArea(contour)
+		print('single contour area:', area)
+		if area < 250:
+			continue
+		# if len(cv2.approxPolyDP(contour,0.04 * peri, True)) == 4:
 		foundCenter = get_center(contour)
 		Dx = abs(foundCenter[0] - mid_frame) 
 		if(sm_Dx > Dx):
@@ -508,6 +513,10 @@ while True:
 
 		print('distance', calc_distance, 'angle1', calc_angle1 *(180/math.pi), 'angle2', calc_angle2 *(180/math.pi))
 		print("")
+
+		#angle to run straight at the target.
+		direct_turn = calc_angle1 *(180/math.pi)
+
 		# find angles and side of triangle set forwards from target 
 		calc_c_side, calc_a_angle, calc_b_angle = find_triangle(calc_distance, calc_angle2, TARGET_AIM_OFFSET)
 
@@ -517,13 +526,15 @@ while True:
 		turn1_angle = (calc_angle1 * (180 / math.pi)) - fixed_angleA #calc_a_angle
 		turn2_angle = 180 - (180 - fixed_angleB) # calc_b_angle
 		
-		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET])
-		[turn1_angle, calc_c_side, turn2_angle, goDist2] = vertical_array_avg(window)
+		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET, calc_distance, direct_turn])
+		[turn1_angle, calc_c_side, turn2_angle, goDist2, calc_distance, direct_turn] = vertical_array_avg(window)
 
 		print("turn angle 1", turn1_angle) 	
 		print("go distance", calc_c_side)
 		print("turn angle 2", turn2_angle)
 		print("go distance", goDist2)
+		print("direct turn", direct_turn)
+		print("direct dist", calc_distance)
 		print("")
 
 		# finds average distance from the distances calulated (helps remove some error)
@@ -540,6 +551,8 @@ while True:
 		nwTables.putNumber('DISTANCE_1', calc_c_side)
 		nwTables.putNumber('TURN_2', turn2_angle)
 		nwTables.putNumber('DISTANCE_2', goDist2)
+		nwTables.putNumber('DIRECT_TURN', direct_turn)
+		nwTables.putNumber('DIRECT_DISTANCE', calc_distance)
 
 		if out is not None:
 			out.write(frame)
