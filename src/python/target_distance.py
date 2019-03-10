@@ -559,7 +559,7 @@ while True:
 		nwTables.putNumber('DIRECT_DISTANCE', calc_distance)
 
 		if out is not None:
-			out.write(frame)
+			out.write(frame_hsv)
 
 		# show the frame to our screen
 		if(havedisplay):
