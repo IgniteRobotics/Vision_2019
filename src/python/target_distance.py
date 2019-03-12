@@ -516,10 +516,10 @@ while True:
 		# find angles and side of triangle set forwards from target 
 		calc_c_side, calc_a_angle, calc_b_angle = find_triangle(calc_distance, calc_angle2, TARGET_AIM_OFFSET)
 
-		fixed_angleA = abs(calc_a_angle * (180 / math.pi))
-		fixed_angleB = abs(calc_b_angle * (180 / math.pi))
+		fixed_angleA = calc_a_angle * (180 / math.pi) #removed abs
+		fixed_angleB = calc_b_angle * (180 / math.pi) #removed abs
 		
-		turn1_angle = (calc_angle1 * (180 / math.pi)) - fixed_angleA #calc_a_angle
+		turn1_angle = (calc_angle1 * (180 / math.pi)) + fixed_angleA #calc_a_angle
 		turn2_angle = 180 - (180 - fixed_angleB) # calc_b_angle
 		
 		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET, calc_distance, direct_turn])
