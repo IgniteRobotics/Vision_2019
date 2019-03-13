@@ -8,11 +8,14 @@ import cv2
 import math
 import imutils
 import os
+import sys
 
-havedisplay = "DISPLAY" in os.environ
+havedisplay = ('DISPLAY' in os.environ) or os.name == "nt"
 
-if(havedisplay):
+if(havedisplay): 
 	print("display present")
+else:
+	print("display not present")
 
 greenLower = (0,0,250) 
 greenUpper = (100,255,255) 
@@ -82,20 +85,32 @@ def compute_output_values(self, rvec, tvec):
 	angle2 = math.atan2(pzero_world[0][0], pzero_world[2][0])
 	return distance, angle1, angle2
 
-# construct the argument parse and parse the arguments
-ap = argparse.ArgumentParser()
-ap.add_argument("-v", "--video", help="path to the (optional) video file")
-ap.add_argument("-b", "--buffer", type=int, default=64,	help="max buffer size")
-args = vars(ap.parse_args())
-pts = deque(maxlen=args["buffer"])
 
-# if a video path was not supplied, grab the reference to the webcam
-if not args.get("video", False):
+vs = None
+
+if(len(sys.argv) > 1):
+	if(sys.argv[1].startswith('/dev')):
+		vs = VideoStream(src=sys.argv[1]).start()
+	#if(isinstance(sys.argv[1], int)):
+	else:
+		vs = VideoStream(src=int(sys.argv[1])).start()
+else:
 	vs = VideoStream(src=0).start()
 
+# construct the argument parse and parse the arguments
+#ap = argparse.ArgumentParser()
+#ap.add_argument("-v", "--video", help="path to the (optional) video file")
+#ap.add_argument("-b", "--buffer", type=int, default=64,	help="max buffer size")
+#args = vars(ap.parse_args())
+#pts = deque(maxlen=args["buffer"])
+
+# if a video path was not supplied, grab the reference to the webcam
+#if not args.get("video", False):
+#	vs = VideoStream(src=0).start()
+
 # otherwise, grab a reference to the video file
-else:
-	vs = cv2.VideoCapture(args["video"])
+#else:
+#	vs = cv2.VideoCapture(args["video"])
 
 # allow the camera or video file to warm up
 time.sleep(2.0)
@@ -106,7 +121,7 @@ while True:
 	frame = vs.read()
 
 	# handle the frame from VideoCapture or VideoStream
-	frame = frame[1] if args.get("video", False) else frame
+	#frame = frame[1] if args.get("video", False) else frame
 
 	# if we are viewing a video and we did not grab a frame, then we have reached the end of the video
 	if frame is None:
@@ -167,12 +182,12 @@ while True:
 			break
 
 # if we are not using a video file, stop the camera video stream
-if not args.get("video", False):
-	vs.stop()
+#if not args.get("video", False):
+#	vs.stop()
 
 # otherwise, release the camera
-else:
-	vs.release()
+#else:
+vs.release() #.....???
 
 # close all windows
 cv2.destroyAllWindows()

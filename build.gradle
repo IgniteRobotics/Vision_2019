@@ -5,19 +5,24 @@ plugins {
     id "jaci.gradle.EmbeddedTools" version "2018.12.18"
 }
 
+apply from: "credentials.gradle"
+
+
+
 // Creates a FileTree object to only pull all .py files within
 // the python folder in directory path for deployment.
-FileTree pytree = fileTree(dir: 'src/python', include: '*.py')
+FileTree pytree = fileTree(dir: 'src/python', include: ['*.py', '*.pkl'])
 FileTree bashtree = fileTree(dir: 'src/bash', include: '*.sh')
+FileTree startuptree = fileTree(dir: 'startup', include: '*.service')
 
 // Identifies the remote with a name, jetson, and a host static
 // IP as well as teh username, roboloco. SSH Keys are required
 // to be able to deploy, and setup must be done beforehand.
 remotes {
     jetson {
-        host = '10.68.29.8' // you'll need the real IP here.
-        user = 'nvidia' //'REDACTED'  //and user
-        password = 'nvidia' //'REDACTED' //and pass
+        host = hostIP // you'll need the real IP here.
+        user = sshUser  
+        password = sshPass 
         agent = false
     }
 }
@@ -38,9 +43,29 @@ task deployJetson {
             execute ('mkdir 6829/vision', ignoreError: true)
             execute ('mkdir 6829/vision/python', ignoreError: true)
             execute ('mkdir 6829/vision/bash', ignoreError: true)
+            execute ('mkdir 6829/vision/init.d', ignoreError: true)
             put from: pytree, into: '6829/vision/python'
             put from: bashtree, into: '6829/vision/bash'
-            // execute 'sudo /bin/systemctl restart vision'
+            put from: startuptree, into: '6829/vision/init.d'
+            
+            executeSudo 'cp  /home/nvidia/6829/vision/init.d/sortcams.service /etc/systemd/system/sortcams.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'cp  /home/nvidia/6829/vision/init.d/streamcam.service /etc/systemd/system/streamcam.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'cp  /home/nvidia/6829/vision/init.d/vision.service /etc/systemd/system/vision.service', pty: true, sudoPassword: sshPass, ignoreError: true
+
+            executeSudo 'systemctl daemon-reload', pty: true, sudoPassword: sshPass, ignoreError: true
+
+            // enable so they start automatically.
+            executeSudo 'systemctl reenable sortcams.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl reenable vision.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl reenable streamcam.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            
+            // stop the services but don't stop if this fails.
+            executeSudo 'systemctl stop vision', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl stop streamcam', pty: true, sudoPassword: sshPass, ignoreError: true
+            
+            executeSudo 'systemctl start sortcams', pty: true, sudoPassword: sshPass
+            executeSudo 'systemctl start vision', pty: true, sudoPassword: sshPass
+            executeSudo 'systemctl start streamcam', pty: true, sudoPassword: sshPass
         }
     }
 }

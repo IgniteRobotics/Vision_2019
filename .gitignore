@@ -1,5 +1,8 @@
 # Ignore the super sekrit ssh keys!
 keys/
+# Ignore file with credentials.
+credentials.gradle
+
 
 # Ignore all the dot files
 .classpath
