@@ -189,11 +189,12 @@ def find_triangle(b_side, c_angle, a_side):
 		print("working")
 		a_angle = math.asin((a_side*math.sin(c_angle))/c_side)
 		#print('-1 <= x <= 1 : c_angle ', (b_side*math.sin(c_angle))/c_side)
-		b_angle = math.asin((b_side*math.sin(c_angle))/c_side)
+		b_angle = (math.pi) - (abs(c_angle) + abs(a_angle)) # math.asin((b_side*math.sin(c_angle))/c_side)
 	except:
 		print("borking")
 		a_angle = 0
 		b_angle = 0
+
 	return c_side, a_angle, b_angle
 
 def contour_comparator(a, b):
@@ -519,20 +520,26 @@ while True:
 		fixed_angleA = calc_a_angle * (180 / math.pi) #removed abs
 		fixed_angleB = calc_b_angle * (180 / math.pi) #removed abs
 		
+		print("fixed_angleA: ", fixed_angleA, "fixed_angleB: ", fixed_angleB)
+
 		turn1_angle = (calc_angle1 * (180 / math.pi)) + fixed_angleA #calc_a_angle
-		turn2_angle = 180 - (180 - fixed_angleB) # calc_b_angle
+		turn2_angle = 180 - fixed_angleB # calc_b_angle
 		
+		# if bot is to left of target, turn2 must be a left turn (negative turn)
+		if(calc_angle2 > 0):
+			turn2_angle = turn2_angle * -1
+
 		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET, calc_distance, direct_turn])
 		[turn1_angle, calc_c_side, turn2_angle, goDist2, calc_distance, direct_turn] = vertical_array_avg(window)
 
 		# draw the values at the top-left corner
 		cv2.putText(frame, "Turn Angle 1: " + "{:7.2f}".format(turn1_angle), (20, 20), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-    	cv2.putText(frame, "Go Distance 1: " + "{:7.2f}".format(calc_c_side), (20, 50), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Go Distance 1: " + "{:7.2f}".format(calc_c_side), (20, 50), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 		cv2.putText(frame, "Turn Angle 2: " + "{:7.2f}".format(turn2_angle), (20, 80), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 		cv2.putText(frame, "Go Distance 2: " + "{:7.2f}".format(goDist2), (20, 110), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 		cv2.putText(frame, "Direct Distance: " + "{:7.2f}".format(calc_distance), (20, 140), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 		cv2.putText(frame, "Direct Turn: " + "{:7.2f}".format(direct_turn), (20, 170), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		
+
 		print("turn angle 1", turn1_angle) 	
 		print("go distance", calc_c_side)
 		print("turn angle 2", turn2_angle)
