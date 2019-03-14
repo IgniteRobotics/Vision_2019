@@ -9,6 +9,7 @@ import math
 import imutils
 import pickle
 from networktables import NetworkTables
+from contour_memory import ContourMemory
 import os
 import sys
 
@@ -41,6 +42,9 @@ TARGET_AIM_OFFSET = 24.0    # 24.0 #inches in front of target
 SLIDER_WINDOW = 30 			# number of frames to average accross
 SLIDER_VALUES = 6 			# number of vaules to average accross
 
+# give time to settle??
+MAX_DISTANCE_STEP = 100
+
 # The (x,y,z) points for the corners of the vision target, in the order top left, top right, bottom right, bottom left
 left_obj_points = np.array([[0, 0, 0], [1.945, -0.467, 0], [0.605, -6.058, 0], [-1.34, -5.591, 0]], np.float32)
 right_obj_points = np.array([[0, 0, 0], [1.945, 0.467, 0], [3.287, -5.591, 0], [1.34, -6.058, 0]], np.float32)
@@ -53,6 +57,9 @@ distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
 # opening / loading the cameraMatrix and distortMatrix files
 cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
 distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
+
+#memory obj for contour tracking
+cm = ContourMemory(max_dist_diff=100, max_area_diff=100, min_match=20, max_misses=1)
 
 def dist_array(pt_array, pts_array):
 	sorted_ls = []
@@ -229,8 +236,8 @@ def slope(x1, y1, x2, y2):
 
 def pickTapePairs(contours, img):
 	candidates = []
-	for cnt in contours:
-		cv2.drawContours(img, [cnt], 0, (255,255, 255), 3)
+	#for cnt in contours:
+	#	cv2.drawContours(img, [cnt], 0, (255,255, 255), 3)
 	for contour in contours:
 		print('==== contour ====')
 		perimeter = cv2.arcLength(contour,True)
@@ -239,6 +246,11 @@ def pickTapePairs(contours, img):
 		print ('length:', len(approx))
 		area = cv2.contourArea(contour)
 		print ('area:', area)
+
+		if area < 150:
+			print('Removing this contour.  Area', area, 'too small')
+			continue 
+
 		rect = cv2.minAreaRect(contour)
 		# calculate coordinates of the minimum area rectangle
 		box = cv2.boxPoints(rect)
@@ -281,10 +293,6 @@ def pickTapePairs(contours, img):
 		#if topSlope > 20 or topSlope < 9:  
 		#	print('Removing this contour.  Slope', topSlope, 'too tall')
 		#	continue
-
-		if area < 150:
-			print('Removing this contour.  Area', area, 'too small')
-			continue 
 
 		candidates.append((highestPt, nextHighestPt))
 		# draw contours
@@ -337,7 +345,7 @@ def pickFullOrTopCnt(frame, c, corners):
 	target_pts = None
 	cornerPoints = None
 	side = "???"
-	if ar > 1 and ar < 100:
+	if ar > 2 and ar < 4:
 		print ('USING SINGLE TARGET TAPE')
 			# find the corners of the contour
 
@@ -471,7 +479,11 @@ while True:
 	# find contours in thresholded frame, then grab the largest one
 	cnts = cv2.findContours(frame_hsv.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	cnts = imutils.grab_contours(cnts)
-	
+
+	#memorize contours
+	#only do this once per iteration!!
+	cnts = cm.process_contours(cnts)
+
 	if cnts is not None and (len(cnts) > 0):
 		# prints number of contours found to the monitor 
 		print("found contours", len(cnts))
@@ -508,6 +520,9 @@ while True:
 		# calculate the distance, angle1 (angle from line directly straight in front of camera to the line straight between the camera and target)
 		calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET)
 
+		if(calc_angle1 >= MAX_TURN_ANGLE):
+			print("turn angle1 error! too big!!")
+
 		print('distance', calc_distance, 'angle1', calc_angle1 *(180/math.pi), 'angle2', calc_angle2 *(180/math.pi))
 		print("")
 
@@ -529,6 +544,13 @@ while True:
 		if(calc_angle2 > 0):
 			turn2_angle = turn2_angle * -1
 
+		[avg_turn1_angle, avg_calc_c_side, avg_turn2_angle, avg_goDist2, avg_calc_distance, avg_direct_turn] = vertical_array_avg(window)
+		
+		if(abs(calc_distance - avg_calc_distance) > MAX_DISTANCE_STEP and avg_calc_distance != 0):
+			print("distance changed too much")
+			print("new distance",calc_distance,"avg distance", avg_calc_distance)
+			continue	
+			
 		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET, calc_distance, direct_turn])
 		[turn1_angle, calc_c_side, turn2_angle, goDist2, calc_distance, direct_turn] = vertical_array_avg(window)
 
