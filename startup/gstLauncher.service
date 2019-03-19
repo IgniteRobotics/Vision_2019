@@ -1,6 +1,6 @@
 [Unit]
-Description=Robot Vision Tracking
-After=multi-user.target sortcams.target
+Description=Robot Stream Launcher
+After=multi-user.target sortcams.target streamcam.target
 Conflicts=getty@tty1.service
 
 [Service]
@@ -8,8 +8,7 @@ Type=simple
 User=nvidia
 Group=nvidia
 WorkingDirectory=/home/nvidia/6829/vision/python/
-ExecStartPre=/bin/bash /home/nvidia/6829/vision/bash/config_visioncam.sh
-ExecStart=/usr/bin/python3 /home/nvidia/6829/vision/python/stream_sink.py
+ExecStart=/usr/bin/python3 /home/nvidia/6829/vision/python/gst_Launcher.py
 StandardInput=tty-force
 StandardOutput=syslog
 StandardError=syslog
