@@ -1,0 +1,15 @@
+[Unit]
+Description=Jetson heartbeat
+Conflicts=getty@tty1.service
+After=multi-user.target
+
+[Service]
+Type=simple
+User=nvidia
+Group=nvidia
+ExecStart=/usr/bin/python3/home/nvidia/6829/vision/python/JetsonHeartbeat.py
+StandardOutput=ts
+StandardError=syslog
+Restart=on-failure
+
+[Install]
