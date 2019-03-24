@@ -28,15 +28,15 @@ nwTables = NetworkTables.getTable('Vision')
 out = None
 
 # hsv color range for LED/reflective tape
-greenLower = (0,70,10)      # 0,73,22 
-greenUpper = (90,255,90)    # 90,255,78 
+greenLower = (70,0,111)      # 0,73,22 
+greenUpper = (100,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
-X_OFFSET = 6.0              # inches to midpoint (default left)
-X_OFFSET_LEFT = 6.0         # inches to midpoint
-X_OFFSET_RIGHT = -4.055     # inches to midpoint 
-Z_OFFSET = -21.0            # inches from camera to bumper
+X_OFFSET = 6.0               # inches to midpoint (default left)
+X_OFFSET_LEFT = 6.0          # inches to midpoint
+X_OFFSET_RIGHT = -4.055      # inches to midpoint 
+Z_OFFSET = -21.0             # inches from camera to bumper
 TARGET_AIM_OFFSET = -24.0    # 24.0 #inches in front of target
 
 SLIDER_WINDOW = 30 			# number of frames to average accross
@@ -545,7 +545,7 @@ while True:
 			print("turn angle1 error! too big!!")
 
 		
-		[avg_turn1, avg_distance_1, avg_turn2, avg_distance_2, turn_direct, distance_direct] = vertical_array_avg(window)
+		[avg_turn1, avg_distance_1, avg_turn2, avg_distance_2, avg_turn_direct, avg_distance_direct] = vertical_array_avg(window)
 		
 		# if the distance jumps too much, toss this observation and try again.
 		if(abs(distance_1 - avg_distance_1) > MAX_DISTANCE_STEP and avg_distance_1 != 0):

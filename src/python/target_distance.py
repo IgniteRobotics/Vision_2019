@@ -28,8 +28,8 @@ nwTables = NetworkTables.getTable('Vision')
 out = None
 
 # hsv color range for LED/reflective tape
-greenLower = (0,70,10)      # 0,73,22 
-greenUpper = (90,255,90)    # 90,255,78 
+greenLower = (0,50,20) #(0,70,10)      # 0,73,22 
+greenUpper = (100,255,90) #(90,255,90)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
