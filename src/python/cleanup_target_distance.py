@@ -196,7 +196,6 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
 		turn_2 = -1 * turn_2
 	return angle1*(180/math.pi) , distance, turn_2, (TARGET_DIST_OFFSET*-1)
 
-
 def get_center(contour):
     M = cv2.moments(contour)
     cX = int(M["m10"] / M["m00"])
@@ -429,7 +428,11 @@ def find_best_contour(cnts, mid_frame):
 	return best_contour
 
 
+
 ###################### MAIN LOOP ######################
+
+
+
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -539,12 +542,10 @@ while True:
 		# now get the direct turn and distance.  pass 0 as the last offset
 		turn_direct, distance_direct, _, _ = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, 0)
 		
-
 		print('turn_1', turn_1, 'distance_1', distance_1, 'turn_2', turn_2, 'distance_2', distance_2, 'direct_turn', turn_direct, 'direct_distance', distance_direct, "direct_turn adjusted: ", 180 + turn_direct)
 		if(turn_1 >= MAX_TURN_ANGLE or turn_direct >= MAX_TURN_ANGLE):
 			print("turn angle1 error! too big!!")
 
-		
 		[avg_turn1, avg_distance_1, avg_turn2, avg_distance_2, avg_turn_direct, avg_distance_direct] = vertical_array_avg(window)
 		
 		# if the distance jumps too much, toss this observation and try again.

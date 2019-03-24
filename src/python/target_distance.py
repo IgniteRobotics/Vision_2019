@@ -28,16 +28,16 @@ nwTables = NetworkTables.getTable('Vision')
 out = None
 
 # hsv color range for LED/reflective tape
-greenLower = (0,50,20) #(0,70,10)      # 0,73,22 
-greenUpper = (100,255,90) #(90,255,90)    # 90,255,78 
+greenLower = (31,50,30)      # 0,73,22 
+greenUpper = (95,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
-X_OFFSET = 6.0              # inches to midpoint (default left)
-X_OFFSET_LEFT = 6.0         # inches to midpoint
-X_OFFSET_RIGHT = -4.055     # inches to midpoint 
-Z_OFFSET = -21.0            # inches from camera to bumper
-TARGET_AIM_OFFSET = 24.0    # 24.0 #inches in front of target
+X_OFFSET = 6.0               # inches to midpoint (default left)
+X_OFFSET_LEFT = 6.0          # inches to midpoint
+X_OFFSET_RIGHT = -4.055      # inches to midpoint 
+Z_OFFSET = -21.0             # inches from camera to bumper
+TARGET_AIM_OFFSET = -24.0    # 24.0 #inches in front of target
 
 SLIDER_WINDOW = 30 			# number of frames to average accross
 SLIDER_VALUES = 6 			# number of vaules to average accross
@@ -149,11 +149,12 @@ def rid_noise(img):
 	thresh = cv2.dilate(thresh, None, iterations=2)
 	return thresh
 
-def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET):
+def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
 	'''Compute the necessary output distance and angles'''
 	# adjust tvec for offsets
 	tvec[0] += X_OFFSET
 	tvec[2] += Z_OFFSET
+	tvec[2] += TARGET_DIST_OFFSET
 	
 	# declaring our x and z based on tvec
 	x = tvec[0][0]
@@ -180,7 +181,20 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET):
 	print('posed angles:', angle2*180/math.pi, angle_t2*180/math.pi, angle_t3*180/math.pi)
 
 	# returns distance to target, angle from front of camera to target, and angle from front of target to camera
-	return distance, angle1, angle2
+	# return distance, angle1, angle2
+
+	# change it to return both turns and distances.
+	# also fix to degrees instead of radians
+	# turn_1, distance_1, turn_2, distance_2
+	# the second turn is 180 - angle2
+	turn_2 = 180 - abs(angle2*(180/math.pi))
+	# also need to fix it for right vs left turn
+	# if angle2 is positive (target turns right to face bot)
+	# then turn 2 will be negative (bot turns left to face target)
+	# also the target offset is negative, but the distance 2 should be positive
+	if angle2 > 0:
+		turn_2 = -1 * turn_2
+	return angle1*(180/math.pi), distance, turn_2, (TARGET_DIST_OFFSET*-1)
 
 def get_center(contour):
     M = cv2.moments(contour)
@@ -414,7 +428,11 @@ def find_best_contour(cnts, mid_frame):
 	return best_contour
 
 
+
 ###################### MAIN LOOP ######################
+
+
+
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -518,74 +536,49 @@ while True:
 			continue
 
 		# calculate the distance, angle1 (angle from line directly straight in front of camera to the line straight between the camera and target)
-		calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET)
+		#calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET)
+		turn_1, distance_1, turn_2, distance_2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_AIM_OFFSET)
 
-		if(calc_angle1 >= MAX_TURN_ANGLE):
+		# now get the direct turn and distance. pass 0 as the last offset
+		turn_direct, distance_direct, _, _ = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, 0)
+
+		print('turn_1', turn_1, 'distance_1', distance_1, 'turn_2', turn_2, 'distance_2', distance_2, 'direct_turn', turn_direct, 'direct_distance', distance_direct)
+		if(turn_1 >= MAX_TURN_ANGLE or turn_direct >= MAX_TURN_ANGLE):
 			print("turn angle1 error! too big!!")
-
-		print('distance', calc_distance, 'angle1', calc_angle1 *(180/math.pi), 'angle2', calc_angle2 *(180/math.pi))
-		print("")
-
-		#angle to run straight at the target.
-		direct_turn = calc_angle1 *(180/math.pi)
-
-		# find angles and side of triangle set forwards from target 
-		calc_c_side, calc_a_angle, calc_b_angle = find_triangle(calc_distance, calc_angle2, TARGET_AIM_OFFSET)
-
-		fixed_angleA = calc_a_angle * (180 / math.pi) #removed abs
-		fixed_angleB = calc_b_angle * (180 / math.pi) #removed abs
 		
-		print("fixed_angleA: ", fixed_angleA, "fixed_angleB: ", fixed_angleB)
+		[avg_turn1, avg_distance_1, avg_turn2, avg_distance_2, avg_turn_direct, avg_distance_direct] = vertical_array_avg(window)
 
-		turn1_angle = (calc_angle1 * (180 / math.pi)) + fixed_angleA #calc_a_angle
-		turn2_angle = 180 - fixed_angleB # calc_b_angle
-		
-		# if bot is to left of target, turn2 must be a left turn (negative turn)
-		if(calc_angle2 > 0):
-			turn2_angle = turn2_angle * -1
-
-		[avg_turn1_angle, avg_calc_c_side, avg_turn2_angle, avg_goDist2, avg_calc_distance, avg_direct_turn] = vertical_array_avg(window)
-		
-		if(abs(calc_distance - avg_calc_distance) > MAX_DISTANCE_STEP and avg_calc_distance != 0):
+		# if the distance jumps too much, toss this observation and try again.
+		if(abs(distance_1 - avg_distance_1) > MAX_DISTANCE_STEP and avg_distance_1 != 0):
 			print("distance changed too much")
-			print("new distance",calc_distance,"avg distance", avg_calc_distance)
+			print("new distance", distance_1,"avg distance", avg_distance_1)
 			continue	
 			
-		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET, calc_distance, direct_turn])
-		[turn1_angle, calc_c_side, turn2_angle, goDist2, calc_distance, direct_turn] = vertical_array_avg(window)
+		window = window_push(window, [turn_1, distance_1, turn_2, distance_2, turn_direct, distance_direct])
+		[turn_1, distance_1, turn_2, distance_2, turn_direct, distance_direct] = vertical_array_avg(window)
 
 		# draw the values at the top-left corner
-		cv2.putText(frame, "Turn Angle 1: " + "{:7.2f}".format(turn1_angle), (20, 20), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Go Distance 1: " + "{:7.2f}".format(calc_c_side), (20, 50), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Turn Angle 2: " + "{:7.2f}".format(turn2_angle), (20, 80), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Go Distance 2: " + "{:7.2f}".format(goDist2), (20, 110), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Direct Distance: " + "{:7.2f}".format(calc_distance), (20, 140), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Direct Turn: " + "{:7.2f}".format(direct_turn), (20, 170), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Turn Angle 1: " + "{:7.2f}".format(turn_1), (20, 20), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Go Distance 1: " + "{:7.2f}".format(distance_1), (20, 50), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Turn Angle 2: " + "{:7.2f}".format(turn_2), (20, 80), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Go Distance 2: " + "{:7.2f}".format(distance_2), (20, 110), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Direct Turn: " + "{:7.2f}".format(turn_direct), (20, 140), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Direct Distance: " + "{:7.2f}".format(distance_direct), (20, 170), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 
-		print("turn angle 1", turn1_angle) 	
-		print("go distance", calc_c_side)
-		print("turn angle 2", turn2_angle)
-		print("go distance", goDist2)
-		print("direct turn", direct_turn)
-		print("direct dist", calc_distance)
-		print("")
-
-		# finds average distance from the distances calulated (helps remove some error)
-		average = average * frame_count
-		frame_count += 1
-		average += calc_distance
-		average = average / frame_count
-
-		print("Distance: " + str(calc_distance))
-		print("average distance: " + str(average))
+		print("turn angle 1", turn_1) 	
+		print("go distance", distance_1)
+		print("turn angle 2", turn_2)
+		print("go distance", distance_2)
+		print("turn direct", turn_direct)
+		print("distance direct", distance_direct)
 
 		# print to network tables
-		nwTables.putNumber('TURN_1', turn1_angle)
-		nwTables.putNumber('DISTANCE_1', calc_c_side)
-		nwTables.putNumber('TURN_2', turn2_angle)
-		nwTables.putNumber('DISTANCE_2', goDist2)
-		nwTables.putNumber('DIRECT_TURN', direct_turn)
-		nwTables.putNumber('DIRECT_DISTANCE', calc_distance)
+		nwTables.putNumber('TURN_1', turn_1)
+		nwTables.putNumber('DISTANCE_1', distance_1)
+		nwTables.putNumber('TURN_2', turn_2)
+		nwTables.putNumber('DISTANCE_2', distance_2)
+		nwTables.putNumber('DIRECT_TURN', turn_direct)
+		nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
 
 		if out is not None:
 			out.write(frame)
