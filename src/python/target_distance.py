@@ -33,6 +33,15 @@ greenUpper = (90,255,78) #(95,255,255)    # 90,255,78
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
+# for filtering
+MIN_CONTOUR_AREA = 150
+# remember for Y, 0 is the top! image should be 480 pixels tall
+MIN_Y_COORDINATE = 125
+
+TOP_MAX_AR = 33 # calculated for the tapes, it should be 25, but allow for some buffer
+SINGLE_MIN_AR = 2
+SINGLE_MAX_AR = 5
+
 X_OFFSET = 6.0               # inches to midpoint (default left)
 X_OFFSET_LEFT = 6.0          # inches to midpoint
 X_OFFSET_RIGHT = -4.055      # inches to midpoint 
@@ -203,6 +212,15 @@ def get_center(contour):
     cY = int(M["m01"] / M["m00"])
     return (cX, cY)
 
+def filter_contours(contours):
+	good = []
+	for contour in contours:
+		area = cv2.contourArea(contour)
+		() = get_center(contour)
+		if area >= MIN_CONTOUR_AREA and Y >= MIN_Y_COORDINATE:
+			good.append(contour)
+	return good
+
 def find_triangle(b_side, c_angle, a_side):
 	#goal: find c_side, a_angle, b_anglec
 	c_side = math.sqrt(a_side**2 + b_side**2 - 2*a_side*b_side*math.cos(c_angle))
@@ -259,12 +277,6 @@ def pickTapePairs(contours, img):
 		epsilon = 0.01*cv2.arcLength(contour,True)
 		approx = cv2.approxPolyDP(contour,epsilon,True)
 		print ('length:', len(approx))
-		area = cv2.contourArea(contour)
-		print ('area:', area)
-
-		if area < 100:
-			print('Removing this contour.  Area', area, 'too small')
-			continue 
 
 		rect = cv2.minAreaRect(contour)
 		# calculate coordinates of the minimum area rectangle
@@ -321,7 +333,7 @@ def pickTapePairs(contours, img):
 	
 	success, top_cornerpoints = find_highest_Y_Pts(candidates)
 	if success:
-		ar = 100
+		ar = TOP_MAX_AR
 		print ('top corner points:', top_cornerpoints)
 		min_rect = cv2.minAreaRect(np.array(top_cornerpoints))
 		(center, (w,h), theta) = min_rect
@@ -339,7 +351,7 @@ def pickTapePairs(contours, img):
 		return None, img
 
 def pickFullOrTopCnt(frame, c, corners):
-	ar = 100
+	ar = TOP_MAX_AR
 	
 	print ('Current single target', c.shape)
 	min_rect = cv2.minAreaRect(c)
@@ -360,7 +372,7 @@ def pickFullOrTopCnt(frame, c, corners):
 	target_pts = None
 	cornerPoints = None
 	side = "???"
-	if ar > 2 and ar < 4:
+	if ar > SINGLE_MIN_AR and ar < SINGLE_MAX_AR:
 		print ('USING SINGLE TARGET TAPE')
 			# find the corners of the contour
 
@@ -372,6 +384,7 @@ def pickFullOrTopCnt(frame, c, corners):
 		min_rect = np.int0(box_pts)
 		print("INT: ", min_rect)
 		my_box = min_rect.reshape((-1,1,2))
+		# draw the tapes we're using
 		cv2.polylines(frame, [my_box], True, (0,255,255))
 
 		cornerPoints = order_points(box_pts) #np.array(min_rect))
@@ -416,9 +429,6 @@ def find_best_contour(cnts, mid_frame):
 		peri = cv2.arcLength(contour, True)
 		area = cv2.contourArea(contour)
 		print('single contour area:', area)
-		if area < 250:
-			continue
-		# if len(cv2.approxPolyDP(contour,0.04 * peri, True)) == 4:
 		foundCenter = get_center(contour)
 		Dx = abs(foundCenter[0] - mid_frame) 
 		if(sm_Dx > Dx):
@@ -499,8 +509,11 @@ while True:
 	cnts = cv2.findContours(frame_hsv.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	cnts = imutils.grab_contours(cnts)
 
-	#memorize contours
-	#only do this once per iteration!!
+	# filter contours on size, position etc.
+	cnts = filter_contours(cnts)
+	
+	# memorize contours
+	# only do this once per iteration!!
 	cnts = cm.process_contours(cnts)
 
 	if cnts is not None and (len(cnts) > 0):
