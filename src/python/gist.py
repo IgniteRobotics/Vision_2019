@@ -28,15 +28,15 @@ nwTables = NetworkTables.getTable('Vision')
 out = None
 
 # hsv color range for LED/reflective tape
-greenLower = (0,73,22) #(31,50,30)      # 0,73,22 
-greenUpper = (90,255,78) #(95,255,255)    # 90,255,78 
+greenLower = (70,0,111)      # 0,73,22 
+greenUpper = (100,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
-X_OFFSET = 6.0               # inches to midpoint (default left)
-X_OFFSET_LEFT = 6.0          # inches to midpoint
-X_OFFSET_RIGHT = -4.055      # inches to midpoint 
-Z_OFFSET = -21.0             # inches from camera to bumper
+X_OFFSET = 6.0              # inches to midpoint (default left)
+X_OFFSET_LEFT = 6.0         # inches to midpoint
+X_OFFSET_RIGHT = -4.055     # inches to midpoint 
+Z_OFFSET = -21.0            # inches from camera to bumper
 TARGET_AIM_OFFSET = -24.0    # 24.0 #inches in front of target
 
 SLIDER_WINDOW = 30 			# number of frames to average accross
@@ -58,7 +58,7 @@ distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
 cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
 distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
 
-# memory obj for contour tracking
+#memory obj for contour tracking
 cm = ContourMemory(max_dist_diff=100, max_area_diff=100, min_match=20, max_misses=1)
 
 def dist_array(pt_array, pts_array):
@@ -150,8 +150,10 @@ def rid_noise(img):
 	return thresh
 
 def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
+
 	'''Compute the necessary output distance and angles'''
 	# adjust tvec for offsets
+	print('tvec',tvec)
 	tvec[0] += X_OFFSET
 	tvec[2] += Z_OFFSET
 	tvec[2] += TARGET_DIST_OFFSET
@@ -178,14 +180,14 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
 	angle_t2 = math.atan2(pzero_world[0][0], pzero_world[1][0])
 	angle_t3 = math.atan2(pzero_world[1][0], pzero_world[2][0])
 
-	print('posed angles:', angle2*180/math.pi, angle_t2*180/math.pi, angle_t3*180/math.pi)
+	print('posed angles:', angle1*180/math.pi, angle2*180/math.pi, angle_t2*180/math.pi, angle_t3*180/math.pi)
 
 	# returns distance to target, angle from front of camera to target, and angle from front of target to camera
 	# return distance, angle1, angle2
-
-	# change it to return both turns and distances.
-	# also fix to degrees instead of radians
-	# turn_1, distance_1, turn_2, distance_2
+	
+	# change it to return both turns and distances.  
+	# also fix to degreens instead of radians
+	#turn_1, distance_1, turn_2, distance_2
 	# the second turn is 180 - angle2
 	#turn_2 = 180 - abs(angle2*(180/math.pi))
 	# also need to fix it for right vs left turn
@@ -195,7 +197,8 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
 	turn_2 = angle2*180/math.pi
 	if angle2 > 0:
 		turn_2 = -1 * turn_2
-	return angle1*(180/math.pi), distance, turn_2, (TARGET_DIST_OFFSET*-1)
+	return angle1*(180/math.pi) , distance, turn_2, (TARGET_DIST_OFFSET*-1)
+
 
 def get_center(contour):
     M = cv2.moments(contour)
@@ -429,11 +432,7 @@ def find_best_contour(cnts, mid_frame):
 	return best_contour
 
 
-
 ###################### MAIN LOOP ######################
-
-
-
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -540,19 +539,23 @@ while True:
 		#calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET)
 		turn_1, distance_1, turn_2, distance_2 = compute_output_values(rvec, tvec.copy(), X_OFFSET, Z_OFFSET, TARGET_AIM_OFFSET)
 
-		# now get the direct turn and distance. pass 0 as the last offset
+
+		# now get the direct turn and distance.  pass 0 as the last offset
 		turn_direct, distance_direct, _, _ = compute_output_values(rvec, tvec.copy(), X_OFFSET, Z_OFFSET, 0)
 
-		print('turn_1', turn_1, 'distance_1', distance_1, 'turn_2', turn_2, 'distance_2', distance_2, 'direct_turn', turn_direct, 'direct_distance', distance_direct)
+		
+
+		print('turn_1', turn_1, 'distance_1', distance_1, 'turn_2', turn_2, 'distance_2', distance_2, 'direct_turn', turn_direct, 'direct_distance', distance_direct, "direct_turn adjusted: ", 180 + turn_direct)
 		if(turn_1 >= MAX_TURN_ANGLE or turn_direct >= MAX_TURN_ANGLE):
 			print("turn angle1 error! too big!!")
+
 		
 		[avg_turn1, avg_distance_1, avg_turn2, avg_distance_2, avg_turn_direct, avg_distance_direct] = vertical_array_avg(window)
-
+		
 		# if the distance jumps too much, toss this observation and try again.
 		if(abs(distance_1 - avg_distance_1) > MAX_DISTANCE_STEP and avg_distance_1 != 0):
 			print("distance changed too much")
-			print("new distance", distance_1,"avg distance", avg_distance_1)
+			print("new distance",distance_1,"avg distance", avg_distance_1)
 			continue	
 			
 		window = window_push(window, [turn_1, distance_1, turn_2, distance_2, turn_direct, distance_direct])
@@ -565,7 +568,7 @@ while True:
 		cv2.putText(frame, "Go Distance 2: " + "{:7.2f}".format(distance_2), (20, 110), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 		cv2.putText(frame, "Direct Turn: " + "{:7.2f}".format(turn_direct), (20, 140), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 		cv2.putText(frame, "Direct Distance: " + "{:7.2f}".format(distance_direct), (20, 170), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-
+		
 		print("turn angle 1", turn_1) 	
 		print("go distance", distance_1)
 		print("turn angle 2", turn_2)
@@ -580,7 +583,7 @@ while True:
 		nwTables.putNumber('DISTANCE_2', distance_2)
 		nwTables.putNumber('DIRECT_TURN', turn_direct)
 		nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
-
+		
 		if out is not None:
 			out.write(frame)
 
