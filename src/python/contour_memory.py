@@ -95,3 +95,13 @@ class ContourMemory:
         self.age_out #immediately age everything, that's why the -1's
         #print(len(good), 'good contours')
         return good
+
+    def get_best_contour(self):
+        #
+        init_hit = 0
+        best_contour = None
+        for (loc_code, new_area, hits, misses, contour) in self.all_memory:
+            if(hits > init_hit):
+                init_hit = hits
+                best_contour = contour
+        return best_contour

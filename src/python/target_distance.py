@@ -28,8 +28,8 @@ nwTables = NetworkTables.getTable('Vision')
 out = None
 
 # hsv color range for LED/reflective tape
-greenLower = (0,73,22) #(31,50,30)      # 0,73,22 
-greenUpper = (90,255,78) #(95,255,255)    # 90,255,78 
+greenLower = (34,56,70) #(56,122,38) #(31,50,30)      # 0,73,22 
+greenUpper = (86,235,124) #(90,255,114) #(95,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
@@ -46,7 +46,7 @@ X_OFFSET = 6.0               # inches to midpoint (default left)
 X_OFFSET_LEFT = 6.0          # inches to midpoint
 X_OFFSET_RIGHT = -4.055      # inches to midpoint 
 Z_OFFSET = -21.0             # inches from camera to bumper
-TARGET_AIM_OFFSET = -24.0    # 24.0 #inches in front of target
+TARGET_AIM_OFFSET = -18.0    # 24.0 #inches in front of target
 
 SLIDER_WINDOW = 30 			# number of frames to average accross
 SLIDER_VALUES = 6 			# number of vaules to average accross
@@ -68,7 +68,12 @@ cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb"))
 distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
 
 # memory obj for contour tracking
-cm = ContourMemory(max_dist_diff=100, max_area_diff=100, min_match=20, max_misses=1)
+# max_dist_diff : 
+# max_area_diff : 
+# min_match 	: contour must match a mininum number of frames
+# max_misses 	: 
+cm = ContourMemory(max_dist_diff=250, max_area_diff=100, min_match=10, max_misses=1)
+#picked_cm = ContourMemory(max_dist_diff=250, max_area_diff=100, min_match=4, max_misses=1)
 
 def dist_array(pt_array, pts_array):
 	sorted_ls = []
@@ -201,9 +206,8 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
 	# if angle2 is positive (target turns right to face bot)
 	# then turn 2 will be negative (bot turns left to face target)
 	# also the target offset is negative, but the distance 2 should be positive
-	turn_2 = angle2*180/math.pi
-	if angle2 > 0:
-		turn_2 = -1 * turn_2
+	turn_2 = (angle2*180/math.pi)*(-1)
+		
 	return angle1*(180/math.pi), distance, turn_2, (TARGET_DIST_OFFSET*-1)
 
 def get_center(contour):
@@ -216,7 +220,7 @@ def filter_contours(contours):
 	good = []
 	for contour in contours:
 		area = cv2.contourArea(contour)
-		() = get_center(contour)
+		(X,Y) = get_center(contour)
 		if area >= MIN_CONTOUR_AREA and Y >= MIN_Y_COORDINATE:
 			good.append(contour)
 	return good
@@ -407,7 +411,8 @@ def pickFullOrTopCnt(frame, c, corners):
 			print ('Using Right Side')
 		
 		return target_pts, obj_points 
-
+	return None, None
+	'''
 	else:		
 		print ('USING TOPS OF TARGET TAPES')
 		cTopPts, frame = pickTapePairs(cnts, frame)
@@ -421,7 +426,7 @@ def pickFullOrTopCnt(frame, c, corners):
 			return target_pts, obj_points
 		else:
 			return None, None 
-
+	'''
 def find_best_contour(cnts, mid_frame):
 	sm_Dx = float('inf')
 	best_contour = cnts[0]
@@ -522,7 +527,9 @@ while True:
 		
 		# find the biggest contour in the screen (the closest)
 		c = find_best_contour(cnts, mid_X_frame)
-
+		#_ = picked_cm.process_contours([c])
+		#c = picked_cm.get_best_contour()
+		
 		target_pts, obj_points = pickFullOrTopCnt(frame, c, frame_corners)
 
 		if target_pts is not None and len(target_pts) != 0:
@@ -563,10 +570,10 @@ while True:
 		[avg_turn1, avg_distance_1, avg_turn2, avg_distance_2, avg_turn_direct, avg_distance_direct] = vertical_array_avg(window)
 
 		# if the distance jumps too much, toss this observation and try again.
-		if(abs(distance_1 - avg_distance_1) > MAX_DISTANCE_STEP and avg_distance_1 != 0):
-			print("distance changed too much")
-			print("new distance", distance_1,"avg distance", avg_distance_1)
-			continue	
+		#if(abs(distance_1 - avg_distance_1) > MAX_DISTANCE_STEP and avg_distance_1 != 0):
+		#	print("distance changed too much")
+		#	print("new distance", distance_1,"avg distance", avg_distance_1)
+		#	continue	
 			
 		window = window_push(window, [turn_1, distance_1, turn_2, distance_2, turn_direct, distance_direct])
 		[turn_1, distance_1, turn_2, distance_2, turn_direct, distance_direct] = vertical_array_avg(window)
@@ -587,10 +594,16 @@ while True:
 		print("distance direct", distance_direct)
 
 		# print to network tables
-		nwTables.putNumber('TURN_1', turn_1)
-		nwTables.putNumber('DISTANCE_1', distance_1)
-		nwTables.putNumber('TURN_2', turn_2)
-		nwTables.putNumber('DISTANCE_2', distance_2)
+		# nwTables.putNumber('TURN_1', turn_1)
+		# nwTables.putNumber('DISTANCE_1', distance_1)
+		# nwTables.putNumber('TURN_2', turn_2)
+		# nwTables.putNumber('DISTANCE_2', distance_2)
+		# nwTables.putNumber('DIRECT_TURN', turn_direct)
+		# nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
+		nwTables.putNumber('TURN_1', 15.0)
+		nwTables.putNumber('DISTANCE_1', 36)
+		nwTables.putNumber('TURN_2', -15.0)
+		nwTables.putNumber('DISTANCE_2', 36.0)
 		nwTables.putNumber('DIRECT_TURN', turn_direct)
 		nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
 
