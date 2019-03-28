@@ -464,7 +464,8 @@ def calculateYaw(pixelX, centerX, hFocalLength):
     yaw = math.degrees(math.atan((pixelX - centerX) / hFocalLength))
     return round(yaw)
 
-def target_by_pair(contours, mid_frame):
+def target_by_pair(contours, mid_frame, frame):
+	print('number of contours for targeting:', len(contours))
 	#sort the contours by x coordinate
 	contours = sorted(contours, key=lambda x: get_center(x)[0])
 	#print('X sorted contours: ', contours)
@@ -473,7 +474,7 @@ def target_by_pair(contours, mid_frame):
 	centers = []
 	for i in range(len(contours) -1):
 		centers.append(math.floor((get_center(contours[i])[0] + get_center(contours[i + 1])[0])/2))
-	#print('X centers of pairs:', centers)
+	print('X centers of pairs:', centers)
 	
 	#now find the closest X to center
 	sm_Dx = float('inf')
@@ -481,7 +482,11 @@ def target_by_pair(contours, mid_frame):
 	for x in centers:
 		if ((abs(x - mid_frame)) < sm_Dx):
 			x_target = x
+		#put a dot on each center.
+		cv2.circle(frame, (x, 240), 5, (0, 255, 255))
 	print ('mid-frame', mid_frame, 'closest X:', x_target)
+	#bigger dot on the selected center
+	cv2.circle(frame, (x_target, 240), 10, (0, 255, 255))
 
 	#find the angle to this target
 	target_angle = calculateYaw(x_target, mid_frame, H_FOCAL_LENGTH)
@@ -574,7 +579,7 @@ while True:
 		c = find_best_contour(cnts, mid_X_frame)
 
 		# find target angle for feedback driving
-		x_angle = target_by_pair(cnts, mid_X_frame)
+		x_angle = target_by_pair(cnts, mid_X_frame, frame)
 
 		target_pts, obj_points = pickFullOrTopCnt(frame, c, frame_corners)
 
