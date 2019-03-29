@@ -28,8 +28,8 @@ nwTables = NetworkTables.getTable('Vision')
 out = None
 
 # hsv color range for LED/reflective tape
-greenLower = (34,56,70) #(56,122,38) #(31,50,30)      # 0,73,22 
-greenUpper = (86,235,124) #(90,255,114) #(95,255,255)    # 90,255,78 
+greenLower = (33,80,24) #(56,122,38) #(31,50,30)      # 0,73,22 
+greenUpper = (87,255,125) #(90,255,114) #(95,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
@@ -554,6 +554,13 @@ while True:
 				print("no", e)
 				continue
 		else: # nothing found
+			print("----- NO TARGET FOUND -----")
+			nwTables.putNumber('TURN_1', 0)
+			nwTables.putNumber('DISTANCE_1', 0)
+			nwTables.putNumber('TURN_2', 0)
+			nwTables.putNumber('DISTANCE_2', 0)
+			nwTables.putNumber('DIRECT_TURN', 0)
+			nwTables.putNumber('DIRECT_DISTANCE', 0)
 			continue
 
 		# calculate the distance, angle1 (angle from line directly straight in front of camera to the line straight between the camera and target)
@@ -594,18 +601,18 @@ while True:
 		print("distance direct", distance_direct)
 
 		# print to network tables
-		# nwTables.putNumber('TURN_1', turn_1)
-		# nwTables.putNumber('DISTANCE_1', distance_1)
-		# nwTables.putNumber('TURN_2', turn_2)
-		# nwTables.putNumber('DISTANCE_2', distance_2)
-		# nwTables.putNumber('DIRECT_TURN', turn_direct)
-		# nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
-		nwTables.putNumber('TURN_1', 15.0)
-		nwTables.putNumber('DISTANCE_1', 36)
-		nwTables.putNumber('TURN_2', -15.0)
-		nwTables.putNumber('DISTANCE_2', 36.0)
+		nwTables.putNumber('TURN_1', turn_1)
+		nwTables.putNumber('DISTANCE_1', distance_1)
+		nwTables.putNumber('TURN_2', turn_2)
+		nwTables.putNumber('DISTANCE_2', distance_2)
 		nwTables.putNumber('DIRECT_TURN', turn_direct)
 		nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
+		#nwTables.putNumber('TURN_1', 15.0)
+		#nwTables.putNumber('DISTANCE_1', 36)
+		#nwTables.putNumber('TURN_2', -15.0)
+		#nwTables.putNumber('DISTANCE_2', 36.0)
+		#nwTables.putNumber('DIRECT_TURN', turn_direct)
+		#nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
 
 		if out is not None:
 			out.write(frame)
@@ -618,6 +625,14 @@ while True:
 			# if the 'q' key is pressed, stop the loop
 			if key == ord("q"):
 				break
+	else:
+		print("----- NO TARGET FOUND -----")
+		nwTables.putNumber('TURN_1', 0)
+		nwTables.putNumber('DISTANCE_1', 0)
+		nwTables.putNumber('TURN_2', 0)
+		nwTables.putNumber('DISTANCE_2', 0)
+		nwTables.putNumber('DIRECT_TURN', 0)
+		nwTables.putNumber('DIRECT_DISTANCE', 0)
 
 # if we are not using a video file, stop the camera video stream
 if not args.get("video", False):
