@@ -42,9 +42,13 @@ TOP_MAX_AR = 33 # calculated for the tapes, it should be 25, but allow for some 
 SINGLE_MIN_AR = 2
 SINGLE_MAX_AR = 5
 
-X_OFFSET = 6.0               # inches to midpoint (default left)
-X_OFFSET_LEFT = 6.0          # inches to midpoint
-X_OFFSET_RIGHT = -4.055      # inches to midpoint 
+# X_OFFSET = 6.0               # inches to midpoint (default left)
+# X_OFFSET_LEFT = 6.0          # inches to midpoint
+# X_OFFSET_RIGHT = -4.055      # inches to midpoint 
+X_OFFSET = 0.0               # inches to midpoint (default left)
+X_OFFSET_LEFT = 0.0          # inches to midpoint
+X_OFFSET_RIGHT = -10.055      # inches to midpoint 
+
 Z_OFFSET = -21.0             # inches from camera to bumper
 TARGET_AIM_OFFSET = -18.0    # 24.0 #inches in front of target
 
