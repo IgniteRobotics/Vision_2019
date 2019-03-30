@@ -33,10 +33,10 @@ greenUpper = (100,255,255)    # 90,255,78
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
-X_OFFSET = 6.0               # inches to midpoint (default left)
-X_OFFSET_LEFT = 6.0          # inches to midpoint
-X_OFFSET_RIGHT = -4.055      # inches to midpoint 
-Z_OFFSET = -21.0             # inches from camera to bumper
+X_OFFSET = 6.0              # inches to midpoint (default left)
+X_OFFSET_LEFT = 6.0         # inches to midpoint
+X_OFFSET_RIGHT = -4.055     # inches to midpoint 
+Z_OFFSET = -21.0            # inches from camera to bumper
 TARGET_AIM_OFFSET = -24.0    # 24.0 #inches in front of target
 
 SLIDER_WINDOW = 30 			# number of frames to average accross
@@ -150,8 +150,10 @@ def rid_noise(img):
 	return thresh
 
 def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
+
 	'''Compute the necessary output distance and angles'''
 	# adjust tvec for offsets
+	print('tvec',tvec)
 	tvec[0] += X_OFFSET
 	tvec[2] += Z_OFFSET
 	tvec[2] += TARGET_DIST_OFFSET
@@ -178,7 +180,7 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
 	angle_t2 = math.atan2(pzero_world[0][0], pzero_world[1][0])
 	angle_t3 = math.atan2(pzero_world[1][0], pzero_world[2][0])
 
-	print('posed angles:', angle2*180/math.pi, angle_t2*180/math.pi, angle_t3*180/math.pi)
+	print('posed angles:', angle1*180/math.pi, angle2*180/math.pi, angle_t2*180/math.pi, angle_t3*180/math.pi)
 
 	# returns distance to target, angle from front of camera to target, and angle from front of target to camera
 	# return distance, angle1, angle2
@@ -187,11 +189,12 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
 	# also fix to degreens instead of radians
 	#turn_1, distance_1, turn_2, distance_2
 	# the second turn is 180 - angle2
-	turn_2 = 180 - abs(angle2*(180/math.pi))
+	#turn_2 = 180 - abs(angle2*(180/math.pi))
 	# also need to fix it for right vs left turn
 	# if angle2 is positive (target turns right to face bot)
 	# then turn 2 will be negative (bot turns left to face target)
 	# also the target offset is negative, but the distance 2 should be positive
+	turn_2 = angle2*180/math.pi
 	if angle2 > 0:
 		turn_2 = -1 * turn_2
 	return angle1*(180/math.pi) , distance, turn_2, (TARGET_DIST_OFFSET*-1)
@@ -262,7 +265,7 @@ def pickTapePairs(contours, img):
 		area = cv2.contourArea(contour)
 		print ('area:', area)
 
-		if area < 150:
+		if area < 100:
 			print('Removing this contour.  Area', area, 'too small')
 			continue 
 
@@ -534,10 +537,12 @@ while True:
 
 		# calculate the distance, angle1 (angle from line directly straight in front of camera to the line straight between the camera and target)
 		#calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET)
-		turn_1, distance_1, turn_2, distance_2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_AIM_OFFSET)
+		turn_1, distance_1, turn_2, distance_2 = compute_output_values(rvec, tvec.copy(), X_OFFSET, Z_OFFSET, TARGET_AIM_OFFSET)
+
 
 		# now get the direct turn and distance.  pass 0 as the last offset
-		turn_direct, distance_direct, _, _ = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, 0)
+		turn_direct, distance_direct, _, _ = compute_output_values(rvec, tvec.copy(), X_OFFSET, Z_OFFSET, 0)
+
 		
 
 		print('turn_1', turn_1, 'distance_1', distance_1, 'turn_2', turn_2, 'distance_2', distance_2, 'direct_turn', turn_direct, 'direct_distance', distance_direct, "direct_turn adjusted: ", 180 + turn_direct)

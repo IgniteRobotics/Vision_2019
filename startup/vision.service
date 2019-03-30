@@ -13,6 +13,7 @@ ExecStart=/usr/bin/python3 /home/nvidia/6829/vision/python/target_distance.py
 StandardInput=tty-force
 StandardOutput=syslog
 StandardError=syslog
+SyslogIdentifier=vision
 Restart=on-failure
 
 [Install]

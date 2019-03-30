@@ -28,16 +28,25 @@ nwTables = NetworkTables.getTable('Vision')
 out = None
 
 # hsv color range for LED/reflective tape
-greenLower = (0,50,20) #(0,70,10)      # 0,73,22 
-greenUpper = (100,255,90) #(90,255,90)    # 90,255,78 
+greenLower = (33,80,24) #(56,122,38) #(31,50,30)      # 0,73,22 
+greenUpper = (87,255,125) #(90,255,114) #(95,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
-X_OFFSET = 6.0              # inches to midpoint (default left)
-X_OFFSET_LEFT = 6.0         # inches to midpoint
-X_OFFSET_RIGHT = -4.055     # inches to midpoint 
-Z_OFFSET = -21.0            # inches from camera to bumper
-TARGET_AIM_OFFSET = 24.0    # 24.0 #inches in front of target
+# for filtering
+MIN_CONTOUR_AREA = 150
+# remember for Y, 0 is the top! image should be 480 pixels tall
+MIN_Y_COORDINATE = 125
+
+TOP_MAX_AR = 33 # calculated for the tapes, it should be 25, but allow for some buffer
+SINGLE_MIN_AR = 2
+SINGLE_MAX_AR = 5
+
+X_OFFSET = 6.0               # inches to midpoint (default left)
+X_OFFSET_LEFT = 6.0          # inches to midpoint
+X_OFFSET_RIGHT = -4.055      # inches to midpoint 
+Z_OFFSET = -21.0             # inches from camera to bumper
+TARGET_AIM_OFFSET = -18.0    # 24.0 #inches in front of target
 
 SLIDER_WINDOW = 30 			# number of frames to average accross
 SLIDER_VALUES = 6 			# number of vaules to average accross
@@ -59,7 +68,12 @@ cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb"))
 distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
 
 # memory obj for contour tracking
-cm = ContourMemory(max_dist_diff=100, max_area_diff=100, min_match=20, max_misses=1)
+# max_dist_diff : 
+# max_area_diff : 
+# min_match 	: contour must match a mininum number of frames
+# max_misses 	: 
+cm = ContourMemory(max_dist_diff=250, max_area_diff=100, min_match=10, max_misses=1)
+#picked_cm = ContourMemory(max_dist_diff=250, max_area_diff=100, min_match=4, max_misses=1)
 
 def dist_array(pt_array, pts_array):
 	sorted_ls = []
@@ -149,11 +163,12 @@ def rid_noise(img):
 	thresh = cv2.dilate(thresh, None, iterations=2)
 	return thresh
 
-def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET):
+def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET, TARGET_DIST_OFFSET):
 	'''Compute the necessary output distance and angles'''
 	# adjust tvec for offsets
 	tvec[0] += X_OFFSET
 	tvec[2] += Z_OFFSET
+	tvec[2] += TARGET_DIST_OFFSET
 	
 	# declaring our x and z based on tvec
 	x = tvec[0][0]
@@ -180,13 +195,35 @@ def compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET):
 	print('posed angles:', angle2*180/math.pi, angle_t2*180/math.pi, angle_t3*180/math.pi)
 
 	# returns distance to target, angle from front of camera to target, and angle from front of target to camera
-	return distance, angle1, angle2
+	# return distance, angle1, angle2
+
+	# change it to return both turns and distances.
+	# also fix to degrees instead of radians
+	# turn_1, distance_1, turn_2, distance_2
+	# the second turn is 180 - angle2
+	#turn_2 = 180 - abs(angle2*(180/math.pi))
+	# also need to fix it for right vs left turn
+	# if angle2 is positive (target turns right to face bot)
+	# then turn 2 will be negative (bot turns left to face target)
+	# also the target offset is negative, but the distance 2 should be positive
+	turn_2 = (angle2*180/math.pi)*(-1)
+		
+	return angle1*(180/math.pi), distance, turn_2, (TARGET_DIST_OFFSET*-1)
 
 def get_center(contour):
     M = cv2.moments(contour)
     cX = int(M["m10"] / M["m00"])
     cY = int(M["m01"] / M["m00"])
     return (cX, cY)
+
+def filter_contours(contours):
+	good = []
+	for contour in contours:
+		area = cv2.contourArea(contour)
+		(X,Y) = get_center(contour)
+		if area >= MIN_CONTOUR_AREA and Y >= MIN_Y_COORDINATE:
+			good.append(contour)
+	return good
 
 def find_triangle(b_side, c_angle, a_side):
 	#goal: find c_side, a_angle, b_anglec
@@ -244,12 +281,6 @@ def pickTapePairs(contours, img):
 		epsilon = 0.01*cv2.arcLength(contour,True)
 		approx = cv2.approxPolyDP(contour,epsilon,True)
 		print ('length:', len(approx))
-		area = cv2.contourArea(contour)
-		print ('area:', area)
-
-		if area < 150:
-			print('Removing this contour.  Area', area, 'too small')
-			continue 
 
 		rect = cv2.minAreaRect(contour)
 		# calculate coordinates of the minimum area rectangle
@@ -306,7 +337,7 @@ def pickTapePairs(contours, img):
 	
 	success, top_cornerpoints = find_highest_Y_Pts(candidates)
 	if success:
-		ar = 100
+		ar = TOP_MAX_AR
 		print ('top corner points:', top_cornerpoints)
 		min_rect = cv2.minAreaRect(np.array(top_cornerpoints))
 		(center, (w,h), theta) = min_rect
@@ -324,7 +355,7 @@ def pickTapePairs(contours, img):
 		return None, img
 
 def pickFullOrTopCnt(frame, c, corners):
-	ar = 100
+	ar = TOP_MAX_AR
 	
 	print ('Current single target', c.shape)
 	min_rect = cv2.minAreaRect(c)
@@ -345,7 +376,7 @@ def pickFullOrTopCnt(frame, c, corners):
 	target_pts = None
 	cornerPoints = None
 	side = "???"
-	if ar > 2 and ar < 4:
+	if ar > SINGLE_MIN_AR and ar < SINGLE_MAX_AR:
 		print ('USING SINGLE TARGET TAPE')
 			# find the corners of the contour
 
@@ -357,6 +388,7 @@ def pickFullOrTopCnt(frame, c, corners):
 		min_rect = np.int0(box_pts)
 		print("INT: ", min_rect)
 		my_box = min_rect.reshape((-1,1,2))
+		# draw the tapes we're using
 		cv2.polylines(frame, [my_box], True, (0,255,255))
 
 		cornerPoints = order_points(box_pts) #np.array(min_rect))
@@ -379,7 +411,8 @@ def pickFullOrTopCnt(frame, c, corners):
 			print ('Using Right Side')
 		
 		return target_pts, obj_points 
-
+	return None, None
+	'''
 	else:		
 		print ('USING TOPS OF TARGET TAPES')
 		cTopPts, frame = pickTapePairs(cnts, frame)
@@ -393,7 +426,7 @@ def pickFullOrTopCnt(frame, c, corners):
 			return target_pts, obj_points
 		else:
 			return None, None 
-
+	'''
 def find_best_contour(cnts, mid_frame):
 	sm_Dx = float('inf')
 	best_contour = cnts[0]
@@ -401,9 +434,6 @@ def find_best_contour(cnts, mid_frame):
 		peri = cv2.arcLength(contour, True)
 		area = cv2.contourArea(contour)
 		print('single contour area:', area)
-		if area < 250:
-			continue
-		# if len(cv2.approxPolyDP(contour,0.04 * peri, True)) == 4:
 		foundCenter = get_center(contour)
 		Dx = abs(foundCenter[0] - mid_frame) 
 		if(sm_Dx > Dx):
@@ -414,7 +444,11 @@ def find_best_contour(cnts, mid_frame):
 	return best_contour
 
 
+
 ###################### MAIN LOOP ######################
+
+
+
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -480,8 +514,11 @@ while True:
 	cnts = cv2.findContours(frame_hsv.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	cnts = imutils.grab_contours(cnts)
 
-	#memorize contours
-	#only do this once per iteration!!
+	# filter contours on size, position etc.
+	cnts = filter_contours(cnts)
+	
+	# memorize contours
+	# only do this once per iteration!!
 	cnts = cm.process_contours(cnts)
 
 	if cnts is not None and (len(cnts) > 0):
@@ -490,7 +527,9 @@ while True:
 		
 		# find the biggest contour in the screen (the closest)
 		c = find_best_contour(cnts, mid_X_frame)
-
+		#_ = picked_cm.process_contours([c])
+		#c = picked_cm.get_best_contour()
+		
 		target_pts, obj_points = pickFullOrTopCnt(frame, c, frame_corners)
 
 		if target_pts is not None and len(target_pts) != 0:
@@ -515,77 +554,65 @@ while True:
 				print("no", e)
 				continue
 		else: # nothing found
+			print("----- NO TARGET FOUND -----")
+			nwTables.putNumber('TURN_1', 0)
+			nwTables.putNumber('DISTANCE_1', 0)
+			nwTables.putNumber('TURN_2', 0)
+			nwTables.putNumber('DISTANCE_2', 0)
+			nwTables.putNumber('DIRECT_TURN', 0)
+			nwTables.putNumber('DIRECT_DISTANCE', 0)
 			continue
 
 		# calculate the distance, angle1 (angle from line directly straight in front of camera to the line straight between the camera and target)
-		calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET)
+		#calc_distance, calc_angle1, calc_angle2 = compute_output_values(rvec, tvec, X_OFFSET, Z_OFFSET)
+		turn_1, distance_1, turn_2, distance_2 = compute_output_values(rvec, tvec.copy(), X_OFFSET, Z_OFFSET, TARGET_AIM_OFFSET)
 
-		if(calc_angle1 >= MAX_TURN_ANGLE):
+		# now get the direct turn and distance. pass 0 as the last offset
+		turn_direct, distance_direct, _, _ = compute_output_values(rvec, tvec.copy(), X_OFFSET, Z_OFFSET, 0)
+
+		print('turn_1', turn_1, 'distance_1', distance_1, 'turn_2', turn_2, 'distance_2', distance_2, 'direct_turn', turn_direct, 'direct_distance', distance_direct)
+		if(turn_1 >= MAX_TURN_ANGLE or turn_direct >= MAX_TURN_ANGLE):
 			print("turn angle1 error! too big!!")
-
-		print('distance', calc_distance, 'angle1', calc_angle1 *(180/math.pi), 'angle2', calc_angle2 *(180/math.pi))
-		print("")
-
-		#angle to run straight at the target.
-		direct_turn = calc_angle1 *(180/math.pi)
-
-		# find angles and side of triangle set forwards from target 
-		calc_c_side, calc_a_angle, calc_b_angle = find_triangle(calc_distance, calc_angle2, TARGET_AIM_OFFSET)
-
-		fixed_angleA = calc_a_angle * (180 / math.pi) #removed abs
-		fixed_angleB = calc_b_angle * (180 / math.pi) #removed abs
 		
-		print("fixed_angleA: ", fixed_angleA, "fixed_angleB: ", fixed_angleB)
+		[avg_turn1, avg_distance_1, avg_turn2, avg_distance_2, avg_turn_direct, avg_distance_direct] = vertical_array_avg(window)
 
-		turn1_angle = (calc_angle1 * (180 / math.pi)) + fixed_angleA #calc_a_angle
-		turn2_angle = 180 - fixed_angleB # calc_b_angle
-		
-		# if bot is to left of target, turn2 must be a left turn (negative turn)
-		if(calc_angle2 > 0):
-			turn2_angle = turn2_angle * -1
-
-		[avg_turn1_angle, avg_calc_c_side, avg_turn2_angle, avg_goDist2, avg_calc_distance, avg_direct_turn] = vertical_array_avg(window)
-		
-		if(abs(calc_distance - avg_calc_distance) > MAX_DISTANCE_STEP and avg_calc_distance != 0):
-			print("distance changed too much")
-			print("new distance",calc_distance,"avg distance", avg_calc_distance)
-			continue	
+		# if the distance jumps too much, toss this observation and try again.
+		#if(abs(distance_1 - avg_distance_1) > MAX_DISTANCE_STEP and avg_distance_1 != 0):
+		#	print("distance changed too much")
+		#	print("new distance", distance_1,"avg distance", avg_distance_1)
+		#	continue	
 			
-		window = window_push(window, [turn1_angle, calc_c_side, turn2_angle, TARGET_AIM_OFFSET, calc_distance, direct_turn])
-		[turn1_angle, calc_c_side, turn2_angle, goDist2, calc_distance, direct_turn] = vertical_array_avg(window)
+		window = window_push(window, [turn_1, distance_1, turn_2, distance_2, turn_direct, distance_direct])
+		[turn_1, distance_1, turn_2, distance_2, turn_direct, distance_direct] = vertical_array_avg(window)
 
 		# draw the values at the top-left corner
-		cv2.putText(frame, "Turn Angle 1: " + "{:7.2f}".format(turn1_angle), (20, 20), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Go Distance 1: " + "{:7.2f}".format(calc_c_side), (20, 50), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Turn Angle 2: " + "{:7.2f}".format(turn2_angle), (20, 80), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Go Distance 2: " + "{:7.2f}".format(goDist2), (20, 110), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Direct Distance: " + "{:7.2f}".format(calc_distance), (20, 140), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
-		cv2.putText(frame, "Direct Turn: " + "{:7.2f}".format(direct_turn), (20, 170), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Turn Angle 1: " + "{:7.2f}".format(turn_1), (20, 20), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Go Distance 1: " + "{:7.2f}".format(distance_1), (20, 50), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Turn Angle 2: " + "{:7.2f}".format(turn_2), (20, 80), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Go Distance 2: " + "{:7.2f}".format(distance_2), (20, 110), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Direct Turn: " + "{:7.2f}".format(turn_direct), (20, 140), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "Direct Distance: " + "{:7.2f}".format(distance_direct), (20, 170), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 
-		print("turn angle 1", turn1_angle) 	
-		print("go distance", calc_c_side)
-		print("turn angle 2", turn2_angle)
-		print("go distance", goDist2)
-		print("direct turn", direct_turn)
-		print("direct dist", calc_distance)
-		print("")
-
-		# finds average distance from the distances calulated (helps remove some error)
-		average = average * frame_count
-		frame_count += 1
-		average += calc_distance
-		average = average / frame_count
-
-		print("Distance: " + str(calc_distance))
-		print("average distance: " + str(average))
+		print("turn angle 1", turn_1) 	
+		print("go distance", distance_1)
+		print("turn angle 2", turn_2)
+		print("go distance", distance_2)
+		print("turn direct", turn_direct)
+		print("distance direct", distance_direct)
 
 		# print to network tables
-		nwTables.putNumber('TURN_1', turn1_angle)
-		nwTables.putNumber('DISTANCE_1', calc_c_side)
-		nwTables.putNumber('TURN_2', turn2_angle)
-		nwTables.putNumber('DISTANCE_2', goDist2)
-		nwTables.putNumber('DIRECT_TURN', direct_turn)
-		nwTables.putNumber('DIRECT_DISTANCE', calc_distance)
+		nwTables.putNumber('TURN_1', turn_1)
+		nwTables.putNumber('DISTANCE_1', distance_1)
+		nwTables.putNumber('TURN_2', turn_2)
+		nwTables.putNumber('DISTANCE_2', distance_2)
+		nwTables.putNumber('DIRECT_TURN', turn_direct)
+		nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
+		#nwTables.putNumber('TURN_1', 15.0)
+		#nwTables.putNumber('DISTANCE_1', 36)
+		#nwTables.putNumber('TURN_2', -15.0)
+		#nwTables.putNumber('DISTANCE_2', 36.0)
+		#nwTables.putNumber('DIRECT_TURN', turn_direct)
+		#nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
 
 		if out is not None:
 			out.write(frame)
@@ -598,6 +625,14 @@ while True:
 			# if the 'q' key is pressed, stop the loop
 			if key == ord("q"):
 				break
+	else:
+		print("----- NO TARGET FOUND -----")
+		nwTables.putNumber('TURN_1', 0)
+		nwTables.putNumber('DISTANCE_1', 0)
+		nwTables.putNumber('TURN_2', 0)
+		nwTables.putNumber('DISTANCE_2', 0)
+		nwTables.putNumber('DIRECT_TURN', 0)
+		nwTables.putNumber('DIRECT_DISTANCE', 0)
 
 # if we are not using a video file, stop the camera video stream
 if not args.get("video", False):
