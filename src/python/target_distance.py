@@ -28,8 +28,8 @@ nwTables = NetworkTables.getTable('Vision')
 out = None
 
 # hsv color range for LED/reflective tape
-greenLower = (33,80,24) #(56,122,38) #(31,50,30)      # 0,73,22 
-greenUpper = (87,255,125) #(90,255,114) #(95,255,255)    # 90,255,78 
+greenLower = (39,55,67) #(56,122,38) #(31,50,30)      # 0,73,22 
+greenUpper = (82,255,153) #(90,255,114) #(95,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
@@ -42,9 +42,13 @@ TOP_MAX_AR = 33 # calculated for the tapes, it should be 25, but allow for some 
 SINGLE_MIN_AR = 2
 SINGLE_MAX_AR = 5
 
-X_OFFSET = 6.0               # inches to midpoint (default left)
-X_OFFSET_LEFT = 6.0          # inches to midpoint
-X_OFFSET_RIGHT = -4.055      # inches to midpoint 
+# X_OFFSET = 6.0               # inches to midpoint (default left)
+# X_OFFSET_LEFT = 6.0          # inches to midpoint
+# X_OFFSET_RIGHT = -4.055      # inches to midpoint 
+X_OFFSET = 0.0               # inches to midpoint (default left)
+X_OFFSET_LEFT = 0.0          # inches to midpoint
+X_OFFSET_RIGHT = -10.055      # inches to midpoint 
+
 Z_OFFSET = -21.0             # inches from camera to bumper
 TARGET_AIM_OFFSET = -18.0    # 24.0 #inches in front of target
 
@@ -66,6 +70,21 @@ distortMatrix_filepath = "/home/nvidia/6829/vision/python/distortMatrix.pkl"
 # opening / loading the cameraMatrix and distortMatrix files
 cameraMatrix = pickle.load(open(cameraMatrix_filepath, "rb")) 
 distortMatrix = pickle.load(open(distortMatrix_filepath, "rb"))
+
+#######  NEW VALUES FOR FEEDBACK LOOP STEERING ######
+#incoming image dimension
+image_width = 640
+image_height = 480
+
+diagonalFOV = math.radians(78)
+horizontalAspect = 16
+verticalAspect = 9
+
+horizontalFOV = math.radians(70.42) 
+verticalFOV = math.radians(43.3)
+
+H_FOCAL_LENGTH = image_width / (2*math.tan((horizontalFOV/2)))
+V_FOCAL_LENGTH = image_height / (2*math.tan((verticalFOV/2)))
 
 # memory obj for contour tracking
 # max_dist_diff : 
@@ -444,6 +463,41 @@ def find_best_contour(cnts, mid_frame):
 	return best_contour
 
 
+# returns the angle to the target coordinate IN DEGREES
+def calculateYaw(pixelX, centerX, hFocalLength):
+    yaw = math.degrees(math.atan((pixelX - centerX) / hFocalLength))
+    return round(yaw)
+
+def target_by_pair(contours, mid_frame, frame):
+	print('number of contours for targeting:', len(contours))
+	#sort the contours by x coordinate
+	contours = sorted(contours, key=lambda x: get_center(x)[0])
+	#print('X sorted contours: ', contours)
+	
+	#now find the center X of each pair
+	centers = []
+	for i in range(len(contours) -1):
+		centers.append(math.floor((get_center(contours[i])[0] + get_center(contours[i + 1])[0])/2))
+	print('X centers of pairs:', centers)
+	
+	#now find the closest X to center
+	sm_Dx = float('inf')
+	x_target = 0
+	for x in centers:
+		if ((abs(x - mid_frame)) < sm_Dx):
+			x_target = x
+		#put a dot on each center.
+		cv2.circle(frame, (x, 240), 5, (0, 255, 255))
+	print ('mid-frame', mid_frame, 'closest X:', x_target)
+	#bigger dot on the selected center
+	cv2.circle(frame, (x_target, 240), 10, (0, 255, 255))
+
+	#find the angle to this target
+	target_angle = calculateYaw(x_target, mid_frame, H_FOCAL_LENGTH)
+	print('X angle to target:', target_angle)
+
+	return target_angle
+
 
 ###################### MAIN LOOP ######################
 
@@ -527,9 +581,10 @@ while True:
 		
 		# find the biggest contour in the screen (the closest)
 		c = find_best_contour(cnts, mid_X_frame)
-		#_ = picked_cm.process_contours([c])
-		#c = picked_cm.get_best_contour()
-		
+
+		# find target angle for feedback driving
+		x_angle = target_by_pair(cnts, mid_X_frame, frame)
+
 		target_pts, obj_points = pickFullOrTopCnt(frame, c, frame_corners)
 
 		if target_pts is not None and len(target_pts) != 0:
@@ -592,6 +647,7 @@ while True:
 		cv2.putText(frame, "Go Distance 2: " + "{:7.2f}".format(distance_2), (20, 110), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 		cv2.putText(frame, "Direct Turn: " + "{:7.2f}".format(turn_direct), (20, 140), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 		cv2.putText(frame, "Direct Distance: " + "{:7.2f}".format(distance_direct), (20, 170), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
+		cv2.putText(frame, "X Angle: " + "{:7.2f}".format(x_angle), (20, 200), cv2.FONT_HERSHEY_SIMPLEX,0.75, (255, 255, 255), thickness=2)
 
 		print("turn angle 1", turn_1) 	
 		print("go distance", distance_1)
@@ -599,6 +655,7 @@ while True:
 		print("go distance", distance_2)
 		print("turn direct", turn_direct)
 		print("distance direct", distance_direct)
+		print('X_ANGLE', x_angle)
 
 		# print to network tables
 		nwTables.putNumber('TURN_1', turn_1)
@@ -607,12 +664,7 @@ while True:
 		nwTables.putNumber('DISTANCE_2', distance_2)
 		nwTables.putNumber('DIRECT_TURN', turn_direct)
 		nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
-		#nwTables.putNumber('TURN_1', 15.0)
-		#nwTables.putNumber('DISTANCE_1', 36)
-		#nwTables.putNumber('TURN_2', -15.0)
-		#nwTables.putNumber('DISTANCE_2', 36.0)
-		#nwTables.putNumber('DIRECT_TURN', turn_direct)
-		#nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
+		nwTables.putNumber('X_ANGLE', x_angle)
 
 		if out is not None:
 			out.write(frame)
