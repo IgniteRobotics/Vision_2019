@@ -31,10 +31,11 @@ out = None
 greenLower = (39,55,67) #(56,122,38) #(31,50,30)      # 0,73,22 
 greenUpper = (82,255,153) #(90,255,114) #(95,255,255)    # 90,255,78 
 
+
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
 # for filtering
-MIN_CONTOUR_AREA = 150
+MIN_CONTOUR_AREA = 75
 # remember for Y, 0 is the top! image should be 480 pixels tall
 MIN_Y_COORDINATE = 125
 
@@ -473,11 +474,19 @@ def target_by_pair(contours, mid_frame, frame):
 	#sort the contours by x coordinate
 	contours = sorted(contours, key=lambda x: get_center(x)[0])
 	#print('X sorted contours: ', contours)
+
+	cv2.drawContours(frame, contours, 0, (0,255,0), 3)
 	
 	#now find the center X of each pair
 	centers = []
 	for i in range(len(contours) -1):
-		centers.append(math.floor((get_center(contours[i])[0] + get_center(contours[i + 1])[0])/2))
+		(cx0,cy0) = get_center(contours[i])
+		(cx1,cy1) = get_center(contours[i + 1])
+		centers.append(math.floor((cx0 + cx1)/2))
+
+		cv2.circle(frame, (cx0, cy0), 5, (255, 255, 255))
+		cv2.circle(frame, (cx1, cy1), 5, (255, 255, 255))
+
 	print('X centers of pairs:', centers)
 	
 	#now find the closest X to center
