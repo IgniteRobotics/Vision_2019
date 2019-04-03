@@ -32,8 +32,8 @@ out = None
 ts = datetime.datetime.now().timestamp()
 
 # hsv color range for LED/reflective tape
-greenLower = (48,111,44) #(56,122,38) #(31,50,30)      # 0,73,22 
-greenUpper = (86,255,105) #(90,255,114) #(95,255,255)    # 90,255,78 
+greenLower = (49,110,12) #(56,122,38) #(31,50,30)      # 0,73,22 
+greenUpper = (86,255,255) #(90,255,114) #(95,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
@@ -595,7 +595,7 @@ while True:
 	
 	# memorize contours
 	# only do this once per iteration!!
-	cnts = cm.process_contours(cnts)
+	# cnts = cm.process_contours(cnts)
 
 	if cnts is not None and (len(cnts) > 0):
 		# prints number of contours found to the monitor 
@@ -605,7 +605,9 @@ while True:
 		c = find_best_contour(cnts, mid_X_frame)
 
 		# find target angle for feedback driving
-		x_angle = target_by_pair(cnts, mid_X_frame, frame)
+		x_angle = 0
+		if (len(cnts) < 6):
+			x_angle = target_by_pair(cnts, mid_X_frame, frame)
 
 		target_pts, obj_points = pickFullOrTopCnt(frame, c, frame_corners)
 
@@ -687,6 +689,7 @@ while True:
 		nwTables.putNumber('DIRECT_TURN', turn_direct)
 		nwTables.putNumber('DIRECT_DISTANCE', distance_direct)
 		nwTables.putNumber('X_ANGLE', x_angle)
+		nwTables.putNumber('TARGET_COUNT', len(cnts))
 
 		if out is not None:
 			out.write(frame)

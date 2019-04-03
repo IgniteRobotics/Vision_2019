@@ -52,6 +52,7 @@ task deployJetson {
             executeSudo 'cp  /home/nvidia/6829/vision/init.d/streamcam.service /etc/systemd/system/streamcam.service', pty: true, sudoPassword: sshPass, ignoreError: true
             executeSudo 'cp  /home/nvidia/6829/vision/init.d/vision.service /etc/systemd/system/vision.service', pty: true, sudoPassword: sshPass, ignoreError: true
             executeSudo 'cp  /home/nvidia/6829/vision/init.d/heartbeat.service /etc/systemd/system/heartbeat.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'cp  /home/nvidia/6829/vision/init.d/vision_config.service /etc/systemd/system/vision_config.service', pty: true, sudoPassword: sshPass, ignoreError: true
             
             executeSudo 'cp  /home/nvidia/6829/vision/init.d/vision_syslog.conf /etc/rsyslog.d/vision_syslog.conf', pty: true, sudoPassword: sshPass, ignoreError: true
 
@@ -63,13 +64,16 @@ task deployJetson {
             executeSudo 'systemctl reenable vision.service', pty: true, sudoPassword: sshPass, ignoreError: true
             executeSudo 'systemctl reenable streamcam.service', pty: true, sudoPassword: sshPass, ignoreError: true
             executeSudo 'systemctl reenable heartbeat.service', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl reenable vision_config.service', pty: true, sudoPassword: sshPass, ignoreError: true
 
             // stop the services but don't stop if this fails.
             executeSudo 'systemctl stop vision', pty: true, sudoPassword: sshPass, ignoreError: true
             executeSudo 'systemctl stop streamcam', pty: true, sudoPassword: sshPass, ignoreError: true
             executeSudo 'systemctl stop heartbeat', pty: true, sudoPassword: sshPass, ignoreError: true
+            executeSudo 'systemctl stop vision_config', pty: true, sudoPassword: sshPass, ignoreError: true
 
             executeSudo 'systemctl start sortcams', pty: true, sudoPassword: sshPass
+            executeSudo 'systemctl start vision_config', pty: true, sudoPassword: sshPass
             executeSudo 'systemctl start vision', pty: true, sudoPassword: sshPass
             executeSudo 'systemctl start streamcam', pty: true, sudoPassword: sshPass
             executeSudo 'systemctl start heartbeat', pty: true, sudoPassword: sshPass

@@ -1,0 +1,13 @@
+[Unit]
+Description=Vision Cam Config
+After=multi-user.target sortcams.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /home/nvidia/6829/vision/bash/config_visioncam.sh
+StandardInput=tty-force
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
