@@ -3,6 +3,7 @@ from imutils.video import VideoStream
 from imutils import paths
 import numpy as np
 import argparse
+import datetime
 import time
 import cv2
 import math
@@ -27,10 +28,12 @@ nwTables = NetworkTables.getTable('Vision')
 # initializes out (to be defined later in loop)
 out = None
 
-# hsv color range for LED/reflective tape
-greenLower = (39,55,67) #(56,122,38) #(31,50,30)      # 0,73,22 
-greenUpper = (82,255,153) #(90,255,114) #(95,255,255)    # 90,255,78 
+# time stamp
+ts = datetime.datetime.now().timestamp()
 
+# hsv color range for LED/reflective tape
+greenLower = (48,111,44) #(56,122,38) #(31,50,30)      # 0,73,22 
+greenUpper = (86,255,105) #(90,255,114) #(95,255,255)    # 90,255,78 
 
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
@@ -471,6 +474,7 @@ def calculateYaw(pixelX, centerX, hFocalLength):
 
 def target_by_pair(contours, mid_frame, frame):
 	print('number of contours for targeting:', len(contours))
+
 	#sort the contours by x coordinate
 	contours = sorted(contours, key=lambda x: get_center(x)[0])
 	#print('X sorted contours: ', contours)
@@ -479,13 +483,22 @@ def target_by_pair(contours, mid_frame, frame):
 	
 	#now find the center X of each pair
 	centers = []
-	for i in range(len(contours) -1):
-		(cx0,cy0) = get_center(contours[i])
-		(cx1,cy1) = get_center(contours[i + 1])
-		centers.append(math.floor((cx0 + cx1)/2))
 
-		cv2.circle(frame, (cx0, cy0), 5, (255, 255, 255))
-		cv2.circle(frame, (cx1, cy1), 5, (255, 255, 255))
+	if len(contours) == 1:
+		(cx, cy) = get_center(contours[0])
+		centers.append(math.floor(cx))
+
+		cv2.circle(frame, (cx, cy), 5, (255, 255, 255))
+
+		print("one x target found")
+	else:
+		for i in range(len(contours) -1):
+			(cx0,cy0) = get_center(contours[i])
+			(cx1,cy1) = get_center(contours[i + 1])
+			centers.append(math.floor((cx0 + cx1)/2))
+
+			cv2.circle(frame, (cx0, cy0), 5, (255, 255, 255))
+			cv2.circle(frame, (cx1, cy1), 5, (255, 255, 255))
 
 	print('X centers of pairs:', centers)
 	
@@ -553,7 +566,7 @@ while True:
 
 	try:
 		if out is None:
-			out = cv2.VideoWriter('/media/nvidia/logs/output.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 10, (frame_width,frame_height))
+			out = cv2.VideoWriter('/media/nvidia/logs/output_' + str(int(ts)) + '.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 10, (frame_width,frame_height))
 	except:
 		out = None
 
