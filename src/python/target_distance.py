@@ -32,9 +32,8 @@ out = None
 ts = datetime.datetime.now().timestamp()
 
 # hsv color range for LED/reflective tape
-greenLower = (49,110,12) #(56,122,38) #(31,50,30)      # 0,73,22 
-greenUpper = (86,255,255) #(90,255,114) #(95,255,255)    # 90,255,78 
-
+greenLower = (37, 110, 42)#(49,110,12)
+greenUpper = (87,255,255) #(86,255,255)
 MAX_TURN_ANGLE = 35.2 		# half of the horizonal view of 920 cams
 
 # for filtering
