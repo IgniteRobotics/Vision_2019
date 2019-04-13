@@ -470,7 +470,7 @@ def find_best_contour(cnts, mid_frame):
 # returns the angle to the target coordinate IN DEGREES
 def calculateYaw(pixelX, centerX, hFocalLength):
     yaw = math.degrees(math.atan((pixelX - centerX) / hFocalLength))
-    return round(yaw)
+    return yaw
 
 def target_by_pair(contours, mid_frame, frame):
 	print('number of contours for targeting:', len(contours))
