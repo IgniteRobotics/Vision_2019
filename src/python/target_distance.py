@@ -163,16 +163,6 @@ def window_push(window, values):
 def vertical_array_avg(window_array):
     return window_array.mean(axis=0)
 
-def undistort_img(img, cameraMatrix, distortMatrix):
-	h, w = img.shape[:2]
-	newcameraMatrix, roi=cv2.getOptimalNewCameraMatrix(cameraMatrix,distortMatrix,(w,h),1,(w,h))
-	
-	# undistort image
-	dst = cv2.undistort(img, cameraMatrix, distortMatrix, None, newcameraMatrix)
-	
-	# crop the undistored image
-	x,y,w,h = roi
-	return dst[y:y+h, x:x+w]
 	
 def rid_noise(img):
 	#img = cv2.GaussianBlur(img, (3,3), 0) #(11, 11)?
@@ -247,24 +237,6 @@ def filter_contours(contours):
 			good.append(contour)
 	return good
 
-def find_triangle(b_side, c_angle, a_side):
-	#goal: find c_side, a_angle, b_anglec
-	c_side = math.sqrt(a_side**2 + b_side**2 - 2*a_side*b_side*math.cos(c_angle))
-	#print('-1 <= x <= 1 : a_angle ', (a_side*math.sin(c_angle))/c_side)
-	try: 
-		print("working")
-		a_angle = math.asin((a_side*math.sin(c_angle))/c_side)
-		#print('-1 <= x <= 1 : c_angle ', (b_side*math.sin(c_angle))/c_side)
-		b_angle = (math.pi) - (abs(c_angle) + abs(a_angle)) # math.asin((b_side*math.sin(c_angle))/c_side)
-	except:
-		print("borking")
-		a_angle = 0
-		b_angle = 0
-
-	return c_side, a_angle, b_angle
-
-def contour_comparator(a, b):
-	return len(a) > len(b)
 
 def find_highest_Y_Pts(candidates):
 	print('Finding highest Y pts for', len(candidates), 'contours')
@@ -292,89 +264,6 @@ def find_highest_Y_Pts(candidates):
 def slope(x1, y1, x2, y2):
 	return np.rad2deg(np.arctan2(y2 - y1, x2 - x1))
     #return (y2-y1)/(x2-x1)
-
-def pickTapePairs(contours, img):
-	candidates = []
-	#for cnt in contours:
-	#	cv2.drawContours(img, [cnt], 0, (255,255, 255), 3)
-	for contour in contours:
-		print('==== contour ====')
-		perimeter = cv2.arcLength(contour,True)
-		epsilon = 0.01*cv2.arcLength(contour,True)
-		approx = cv2.approxPolyDP(contour,epsilon,True)
-		print ('length:', len(approx))
-
-		rect = cv2.minAreaRect(contour)
-		# calculate coordinates of the minimum area rectangle
-		box = cv2.boxPoints(rect)
-		# normalize coordinates to integers
-		box = np.int0(box)
-		print('box: ',box)
-		cv2.polylines(frame, [box], True, (0,255,255))
-		minY = math.inf
-		minYIndex = 0
-		# find the highest point (minY)
-		for i in range(len(box)):
-			if box[i][1] < minY:
-				minY = box[i][1]
-				minYIndex = i
-		
-		highestPt = (box[minYIndex][0],box[minYIndex][1])
-
-		#find grab the next and prev points for slopes
-		prevPtIndex = minYIndex -1
-		nextPtIndex = minYIndex +1
-		if prevPtIndex == -1:
-			prevPtIndex = 3
-		if nextPtIndex == 4:
-			nextPtIndex = 0
-
-		#determine which one is closest to the Y factor of our point
-		nextHighestPt = (box[prevPtIndex][0],box[prevPtIndex][1])
-		if box[nextPtIndex][1] < nextHighestPt[1]:
-			nextHighestPt = (box[nextPtIndex][0],box[nextPtIndex][1])
-
-		topSlope = slope(highestPt[0],highestPt[1], nextHighestPt[0],nextHighestPt[1])
-		
-		print('==== contour ====')		
-		print('highestPt:', minYIndex, highestPt[0],highestPt[1])
-		print('nextHighestPt:', nextHighestPt[0],nextHighestPt[1])
-		print('slope:', topSlope)
-
-		#if topSlope > 90:
-		#	topSlope = 180 - topSlope
-		#if topSlope > 20 or topSlope < 9:  
-		#	print('Removing this contour.  Slope', topSlope, 'too tall')
-		#	continue
-
-		candidates.append((highestPt, nextHighestPt))
-		# draw contours
-		print(type(box))
-		print(box)
-		#cv2.drawContours(img, [box], 0, (0,0, 255), 3)
-		#print(contour)
-	# print('================')
-	
-	print("CANIDATES: ", candidates)
-	
-	success, top_cornerpoints = find_highest_Y_Pts(candidates)
-	if success:
-		ar = TOP_MAX_AR
-		print ('top corner points:', top_cornerpoints)
-		min_rect = cv2.minAreaRect(np.array(top_cornerpoints))
-		(center, (w,h), theta) = min_rect
-		try:
-			ar = w / float(h)
-		except:
-			print("ar failed")
-
-		print ('top of targets aspect ratio:', str(ar))
-
-		cv2.drawContours(img, [top_cornerpoints], 0, (0,255, 0), 1)
-
-		return np.array(top_cornerpoints), img
-	else:
-		return None, img
 
 def pickFullOrTopCnt(frame, c, corners):
 	ar = TOP_MAX_AR
